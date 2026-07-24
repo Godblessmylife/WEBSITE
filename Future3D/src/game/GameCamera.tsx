@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -13,6 +14,7 @@ const lookAt = new THREE.Vector3()
 
 export function GameCamera({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const { camera } = useThree()
+  const initializedRef = useRef(false)
 
   useFrame((_, delta) => {
     const handle = ecctrlRef.current
@@ -21,8 +23,18 @@ export function GameCamera({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | 
     behind.copy(LOCAL_OFFSET).applyQuaternion(handle.currQuat)
     targetPos.copy(handle.currPos).add(behind)
 
-    const damp = 1 - Math.exp(-4 * delta)
-    camera.position.lerp(targetPos, damp)
+    if (!initializedRef.current) {
+      // Canvas в GameMode не задаёт стартовую позицию камеры — без
+      // этого первый снап делался лерпом от дефолтной позиции R3F,
+      // и путь лерпа мог проходить сквозь пол/персонажа (выглядело бы
+      // как ещё одна причина "падения в текстуры"). Первый кадр —
+      // сразу на месте, без пролёта.
+      camera.position.copy(targetPos)
+      initializedRef.current = true
+    } else {
+      const damp = 1 - Math.exp(-4 * delta)
+      camera.position.lerp(targetPos, damp)
+    }
 
     lookAt.copy(handle.currPos).add(LOOK_OFFSET)
     camera.lookAt(lookAt)

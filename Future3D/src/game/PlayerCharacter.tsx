@@ -29,7 +29,18 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   })
 
   return (
-    <Ecctrl ref={ecctrlRef} capsuleHalfHeight={CAPSULE_HALF_HEIGHT} capsuleRadius={CAPSULE_RADIUS}>
+    // position: без неё Ecctrl спавнится в (0,0,0) — ровно там же, где
+    // верхняя грань земли (DesertGround), то есть капсула персонажа
+    // стартует наполовину закопанной в пол. Отсюда и "падение в
+    // текстуры": увязнув в коллайдере земли с самого первого кадра,
+    // физика ведёт себя непредсказуемо. Спавн заметно выше — короткое
+    // управляемое падение и приземление, как и должно быть.
+    <Ecctrl
+      ref={ecctrlRef}
+      position={[0, 2, 0]}
+      capsuleHalfHeight={CAPSULE_HALF_HEIGHT}
+      capsuleRadius={CAPSULE_RADIUS}
+    >
       <group ref={tiltRef}>
         <primitive object={scene} position={[0, MODEL_Y_OFFSET, 0]} />
       </group>
