@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
+import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Instances, Instance } from '@react-three/drei'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
 
@@ -12,8 +12,7 @@ const FADE_IN_START = 0.74
 const FADE_IN_END = 0.9
 
 // Текстура окон здания — тёмный фасад с сеткой случайно горящих/тёмных
-// окон (жёлтых и голубых). Общая на все инстансы: индивидуальность
-// зданий даёт не текстура, а тон (per-instance color) и пропорции.
+// окон (жёлтых и голубых), общая для всех зданий.
 function createWindowsTexture() {
   const canvas = document.createElement('canvas')
   canvas.width = 128
@@ -45,48 +44,52 @@ function createWindowsTexture() {
 
 interface BuildingSpec {
   position: [number, number, number]
-  scale: [number, number, number]
+  width: number
+  height: number
   color: string
 }
 
 // Детерминированный псевдослучайный хэш вместо Math.random() для
-// раскладки — при каждом ремаунте город одинаковый, легче договариваться
-// об изменениях ("вон то здание у клиринга" всегда одно и то же место).
+// раскладки — при каждом ремаунте город одинаковый.
 function hash(x: number, z: number) {
   const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453
   return v - Math.floor(v)
 }
 
-// Город — сетка кварталов с прорехами (не сплошная стена) и расчищенной
-// площадью в центре, куда прилетает камера (иначе казалось бы, что мы
-// приземляемся прямо в стену домов). Высота падает к краю освоенной
-// зоны, создавая силуэт "плотный центр -> редкие окраины".
+// Здания раньше рендерились через drei Instances с per-instance
+// non-uniform scale + vertexColors — клиент увидел их как "кривые".
+// Убрано полностью: теперь каждое здание — обычный mesh со своей
+// BoxGeometry нужных размеров (никакого scale-трюка, никакой
+// инстанс-окраски), минус производительность инстансинга, зато без
+// всяких сюрпризов с нормалями/матрицами на неоднородном масштабе.
+// Раскладка также сделана менее хаотичной (меньше джиттер).
 function generateCity(): BuildingSpec[] {
   const buildings: BuildingSpec[] = []
-  const half = 10
-  const spacing = 7
-  const clearing = 9
+  const half = 8
+  const spacing = 7.5
+  const clearing = 10
   const palette = ['#3a4a5c', '#2c3a48', '#465868', '#33424f', '#3f5163']
 
   for (let ix = -half; ix <= half; ix++) {
     for (let iz = -half; iz <= half; iz++) {
       const h = hash(ix, iz)
-      const jitterX = (hash(ix, iz + 0.5) - 0.5) * 3
-      const jitterZ = (hash(ix + 0.5, iz) - 0.5) * 3
+      const jitterX = (hash(ix, iz + 0.5) - 0.5) * 1.4
+      const jitterZ = (hash(ix + 0.5, iz) - 0.5) * 1.4
       const x = ix * spacing + jitterX
       const z = iz * spacing + jitterZ
       const distFromCenter = Math.hypot(x, z)
 
       if (distFromCenter < clearing) continue
-      if (h > 0.62) continue // прорехи между кварталами
+      if (h > 0.6) continue // прорехи между кварталами
 
-      const falloff = THREE.MathUtils.clamp(1 - (distFromCenter - clearing) / 55, 0.25, 1)
-      const height = (3 + h * 16) * falloff + 2
-      const footprint = 1.3 + hash(iz, ix) * 1.1
+      const falloff = THREE.MathUtils.clamp(1 - (distFromCenter - clearing) / 45, 0.25, 1)
+      const height = (3 + h * 15) * falloff + 2
+      const width = 1.4 + hash(iz, ix) * 1.0
 
       buildings.push({
         position: [x, height / 2, z],
-        scale: [footprint, height, footprint],
+        width,
+        height,
         color: palette[Math.floor(h * palette.length) % palette.length],
       })
     }
@@ -94,15 +97,45 @@ function generateCity(): BuildingSpec[] {
   return buildings
 }
 
+function Building({
+  spec,
+  texture,
+  materialsRef,
+  index,
+}: {
+  spec: BuildingSpec
+  texture: THREE.Texture
+  materialsRef: RefObject<(THREE.MeshStandardMaterial | null)[]>
+  index: number
+}) {
+  return (
+    <mesh position={spec.position}>
+      <boxGeometry args={[spec.width, spec.height, spec.width]} />
+      <meshStandardMaterial
+        ref={(m) => {
+          materialsRef.current[index] = m
+        }}
+        map={texture}
+        color={spec.color}
+        roughness={0.55}
+        metalness={0.25}
+      />
+    </mesh>
+  )
+}
+
 export function GroundZone() {
   const windowsTexture = useMemo(() => createWindowsTexture(), [])
   const buildings = useMemo(() => generateCity(), [])
+  const buildingMaterialsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([])
 
   const groundRef = useRef<THREE.Mesh>(null!)
-  const buildingsMaterialRef = useRef<THREE.MeshStandardMaterial>(null!)
   const warmLightRef = useRef<THREE.PointLight>(null!)
   const coolLightRef = useRef<THREE.PointLight>(null!)
 
+  // Один useFrame на весь город вместо одного на каждое здание (их
+  // ~100+) — все здания появляются синхронно, отдельные подписки на
+  // кадр для каждого были лишней нагрузкой без всякой пользы.
   useFrame(() => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
     const opacity = THREE.MathUtils.smoothstep(progress, FADE_IN_START, FADE_IN_END)
@@ -113,8 +146,11 @@ export function GroundZone() {
     groundMaterial.opacity = opacity
     groundRef.current.visible = visible
 
-    buildingsMaterialRef.current.transparent = opacity < 1
-    buildingsMaterialRef.current.opacity = opacity
+    for (const material of buildingMaterialsRef.current) {
+      if (!material) continue
+      material.transparent = opacity < 1
+      material.opacity = opacity
+    }
 
     warmLightRef.current.intensity = 90 * opacity
     coolLightRef.current.intensity = 50 * opacity
@@ -127,19 +163,15 @@ export function GroundZone() {
         <meshStandardMaterial color="#10161f" roughness={0.7} metalness={0.15} />
       </mesh>
 
-      <Instances limit={buildings.length} range={buildings.length}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          ref={buildingsMaterialRef}
-          map={windowsTexture}
-          roughness={0.55}
-          metalness={0.25}
-          vertexColors
+      {buildings.map((spec, i) => (
+        <Building
+          key={i}
+          spec={spec}
+          texture={windowsTexture}
+          materialsRef={buildingMaterialsRef}
+          index={i}
         />
-        {buildings.map((b, i) => (
-          <Instance key={i} position={b.position} scale={b.scale} color={b.color} />
-        ))}
-      </Instances>
+      ))}
 
       {/* тёплый/холодный акцентный свет "заката" и "неона" у горизонта */}
       <pointLight ref={warmLightRef} color="#ff9d5c" position={[0, 12, -60]} distance={170} decay={2} />
