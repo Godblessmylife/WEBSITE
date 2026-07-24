@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import '@fontsource/orbitron/700.css'
 import '@fontsource/orbitron/500.css'
 import { useLenis } from '@/hooks/useLenis'
@@ -5,9 +6,14 @@ import { JourneyScene } from '@/scenes/JourneyScene'
 import { Nav } from '@/components/Nav'
 import { PortfolioCarousel } from '@/components/PortfolioCarousel'
 import { GameEntry } from '@/components/GameEntry'
-import { GameMode } from '@/game/GameMode'
 import { useGameStore } from '@/utils/gameStore'
 import './styles/globals.css'
+
+// GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
+// это добавило ~4.3 МБ в основной JS-бандл (gzip 550 КБ -> 2.17 МБ),
+// хотя игру запускает не каждый посетитель. lazy() + Suspense выносят
+// это в отдельный chunk, который грузится только по клику на START.
+const GameMode = lazy(() => import('@/game/GameMode').then((m) => ({ default: m.GameMode })))
 
 // Высота скролл-спейсера определяет, сколько реальных пикселей скролла
 // уходит на полный проход камеры от неба до земли (progress 0 -> 1).
@@ -35,7 +41,11 @@ export function App() {
       </div>
       <PortfolioCarousel />
       <GameEntry />
-      {isGameActive && <GameMode />}
+      {isGameActive && (
+        <Suspense fallback={null}>
+          <GameMode />
+        </Suspense>
+      )}
     </>
   )
 }
