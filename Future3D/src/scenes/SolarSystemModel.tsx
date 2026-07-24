@@ -21,7 +21,7 @@ export function SolarSystemModel() {
   }, [actions, names])
 
   return (
-    <group ref={groupRef} scale={0.6}>
+    <group ref={groupRef}>
       <primitive object={scene} />
       {/* модель не содержит реального источника света (только emissive-
           текстуру солнца) — добавляем point light рядом с центром сцены,
