@@ -29,7 +29,6 @@
     "@react-three/xr": "^6.6.30",
     "3d-force-graph": "^1.80.0",
     "ammo.js": "^0.0.10",
-    "animejs": "^4.5.0",
     "axios": "^1.18.1",
     "cannon-es": "^0.20.0",
     "colyseus.js": "^0.16.22",
