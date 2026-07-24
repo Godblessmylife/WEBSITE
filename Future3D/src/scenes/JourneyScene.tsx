@@ -6,7 +6,6 @@ import { SkyZone } from './SkyZone'
 import { EarthPlanet } from './EarthPlanet'
 import { CloudZone } from './CloudZone'
 import { GroundZone } from './GroundZone'
-import { Hero } from './Hero'
 import { Effects } from '@/effects/Effects'
 
 export function JourneyScene() {
@@ -23,7 +22,6 @@ export function JourneyScene() {
       <EarthPlanet />
       <CloudZone />
       <GroundZone />
-      <Hero />
       <Effects />
     </Canvas>
   )
