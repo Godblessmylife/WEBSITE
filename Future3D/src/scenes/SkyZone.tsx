@@ -1,7 +1,7 @@
 import { Stars } from '@react-three/drei'
 import { SolarSystemModel } from './SolarSystemModel'
 import { ShootingStars } from './ShootingStars'
-import { SOLAR_SYSTEM_TARGET } from './cameraPath'
+import { SOLAR_SYSTEM_TARGET, SOLAR_SYSTEM_SCALE } from './cameraPath'
 
 const ZONE_ORIGIN_Y = 50
 
@@ -20,7 +20,7 @@ export function SkyZone() {
       <Stars radius={100} depth={60} count={6000} factor={4} saturation={0} fade speed={1} />
       <group
         position={[SOLAR_SYSTEM_TARGET.x, SOLAR_SYSTEM_TARGET.y - ZONE_ORIGIN_Y, SOLAR_SYSTEM_TARGET.z]}
-        scale={0.35}
+        scale={SOLAR_SYSTEM_SCALE}
       >
         <SolarSystemModel />
       </group>

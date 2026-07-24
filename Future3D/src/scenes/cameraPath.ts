@@ -28,5 +28,6 @@ export const LOOK_AHEAD = 0.02
 // диск сбоку/впереди, поэтому направление взгляда в начале сделано
 // независимым от касательной пути: без этого в кадр попадал только
 // центр диска (у клиента — "видно только Землю иногда и Марс").
-export const SOLAR_SYSTEM_TARGET = new THREE.Vector3(0, 52, 60)
+export const SOLAR_SYSTEM_TARGET = new THREE.Vector3(0, 50, 40)
+export const SOLAR_SYSTEM_SCALE = 0.33
 export const SOLAR_SYSTEM_LOOKAT_END = 0.1
