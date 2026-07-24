@@ -134,11 +134,11 @@ export function PortfolioCarousel() {
   const dragRef = useRef<DragState>({ active: false, lastX: 0, velocity: 0.15 })
   const rotationRef = useRef(0)
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     dragRef.current.active = true
     dragRef.current.lastX = e.clientX
   }
-  const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!dragRef.current.active) return
     const dx = e.clientX - dragRef.current.lastX
     dragRef.current.lastX = e.clientX

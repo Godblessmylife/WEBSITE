@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite Future3D",
     "build": "vite build Future3D",
-    "preview": "vite preview Future3D"
+    "preview": "vite preview Future3D",
+    "typecheck": "tsc --noEmit -p Future3D/tsconfig.json"
   },
   "dependencies": {
     "24": "^0.0.0",
