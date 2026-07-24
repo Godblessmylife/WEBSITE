@@ -8,6 +8,7 @@ import { useGameStore } from '@/utils/gameStore'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
+import { Portal } from './Portal'
 
 const KEYBOARD_MAP = [
   { name: 'forward', keys: ['ArrowUp', 'KeyW'] },
@@ -36,6 +37,7 @@ export function GameMode() {
               <PlayerCharacter ecctrlRef={ecctrlRef} />
             </KeyboardControls>
             <GameWorld />
+            <Portal ecctrlRef={ecctrlRef} onEnter={() => setGameActive(false)} />
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
