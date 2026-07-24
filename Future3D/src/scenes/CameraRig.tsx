@@ -15,7 +15,7 @@ export function CameraRig() {
     cameraPath.getPointAt(progress, targetPosition)
     cameraPath.getPointAt(lookProgress, lookAtPosition)
 
-    const dampFactor = 1 - Math.exp(-4 * delta)
+    const dampFactor = 1 - Math.exp(-3 * delta)
     state.camera.position.lerp(targetPosition, dampFactor)
 
     // В начале пути взгляд ведёт отдельная цель (солнечная система),

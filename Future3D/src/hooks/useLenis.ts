@@ -14,8 +14,9 @@ function smootherstep(t: number) {
 export function useLenis() {
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.6,
       smoothWheel: true,
+      wheelMultiplier: 0.75,
     })
 
     useScrollStore.getState().setLenis(lenis)
