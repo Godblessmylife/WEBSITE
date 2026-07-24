@@ -4,6 +4,7 @@ import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
 import { cameraPath } from './cameraPath'
 import { useScrollStore } from '@/utils/scrollStore'
+import { HeroModel } from './HeroModel'
 
 // Герой держится немного впереди камеры по прогрессу скролла: при
 // прокрутке вниз он "падает" ближе к земле раньше камеры, при
@@ -42,42 +43,7 @@ export function Hero() {
   return (
     <group ref={groupRef}>
       <Trail width={2.2} length={10} color="#5fd4ff" attenuation={(t) => t * t}>
-        <group>
-          {/* торс */}
-          <mesh>
-            <capsuleGeometry args={[0.28, 0.6, 4, 8]} />
-            <meshStandardMaterial color="#1c2733" roughness={0.4} metalness={0.3} />
-          </mesh>
-          {/* светящееся ядро на груди */}
-          <mesh position={[0, 0.05, 0.28]}>
-            <sphereGeometry args={[0.09, 12, 12]} />
-            <meshBasicMaterial color="#5fd4ff" toneMapped={false} />
-          </mesh>
-          {/* голова */}
-          <mesh position={[0, 0.62, 0]}>
-            <sphereGeometry args={[0.22, 16, 16]} />
-            <meshStandardMaterial color="#0f1620" roughness={0.5} />
-          </mesh>
-          {/* руки в стороны/назад — поза свободного падения */}
-          <mesh position={[0.45, 0.15, -0.1]} rotation={[0.4, 0, -0.9]}>
-            <capsuleGeometry args={[0.1, 0.55, 4, 8]} />
-            <meshStandardMaterial color="#1c2733" roughness={0.4} metalness={0.3} />
-          </mesh>
-          <mesh position={[-0.45, 0.15, -0.1]} rotation={[0.4, 0, 0.9]}>
-            <capsuleGeometry args={[0.1, 0.55, 4, 8]} />
-            <meshStandardMaterial color="#1c2733" roughness={0.4} metalness={0.3} />
-          </mesh>
-          {/* ноги, слегка разведены назад */}
-          <mesh position={[0.16, -0.55, -0.15]} rotation={[0.5, 0, 0.05]}>
-            <capsuleGeometry args={[0.12, 0.6, 4, 8]} />
-            <meshStandardMaterial color="#141b24" roughness={0.5} />
-          </mesh>
-          <mesh position={[-0.16, -0.55, -0.15]} rotation={[0.5, 0, -0.05]}>
-            <capsuleGeometry args={[0.12, 0.6, 4, 8]} />
-            <meshStandardMaterial color="#141b24" roughness={0.5} />
-          </mesh>
-          <pointLight color="#5fd4ff" intensity={4} distance={6} />
-        </group>
+        <HeroModel />
       </Trail>
     </group>
   )
