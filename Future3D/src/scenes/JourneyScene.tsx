@@ -3,6 +3,7 @@ import { CameraRig } from './CameraRig'
 import { FogController } from './FogController'
 import { SceneLighting } from './SceneLighting'
 import { SkyZone } from './SkyZone'
+import { EarthPlanet } from './EarthPlanet'
 import { CloudZone } from './CloudZone'
 import { GroundZone } from './GroundZone'
 import { Hero } from './Hero'
@@ -19,6 +20,7 @@ export function JourneyScene() {
       <FogController />
       <SceneLighting />
       <SkyZone />
+      <EarthPlanet />
       <CloudZone />
       <GroundZone />
       <Hero />
