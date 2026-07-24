@@ -93,6 +93,7 @@ export function GameEntry() {
 
   return (
     <section
+      id="game"
       style={{
         height: '100vh',
         position: 'relative',

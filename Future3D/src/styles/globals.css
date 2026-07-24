@@ -12,4 +12,6 @@ body,
 body {
   background: #05070d;
   overflow-x: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #eafcff;
 }

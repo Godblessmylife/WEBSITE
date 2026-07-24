@@ -150,6 +150,7 @@ export function PortfolioCarousel() {
 
   return (
     <section
+      id="portfolio"
       style={{
         height: '100vh',
         position: 'relative',

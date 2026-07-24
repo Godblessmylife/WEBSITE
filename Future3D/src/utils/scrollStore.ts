@@ -9,6 +9,7 @@ interface ScrollState {
   setProgress: (progress: number, velocity: number) => void
   setLenis: (lenis: Lenis) => void
   scrollToProgress: (target: number) => void
+  scrollToElement: (selector: string) => void
 }
 
 export const useScrollStore = create<ScrollState>((set, get) => ({
@@ -27,5 +28,14 @@ export const useScrollStore = create<ScrollState>((set, get) => ({
     // возвращает "сырую" scroll-позицию, дающую нужный progress.
     const rawTarget = inverseEaseProgress(target)
     lenis.scrollTo(rawTarget * lenis.limit, { duration: 1.6 })
+  },
+  // Для обычных DOM-секций контента (О нас/Цены/Контакты/Игра) —
+  // они идут после 3D-путешествия в нормальном потоке страницы, им не
+  // нужен пересчёт через easeProgress, просто скролл к элементу через
+  // тот же Lenis (чтобы не было двух конкурирующих scroll-систем).
+  scrollToElement: (selector) => {
+    const lenis = get().lenis
+    if (!lenis) return
+    lenis.scrollTo(selector, { duration: 1.6 })
   },
 }))
