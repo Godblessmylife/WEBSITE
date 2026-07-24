@@ -17,18 +17,31 @@ const bgColor = new THREE.Color()
 // ощущение "внутри облака".
 const BACKGROUND_DIM = 0.55
 
+// Раньше высветление начиналось с первого же пикселя скролла (progress
+// > 0) и уже полностью доходило до светлого "облачного" тона к 35% —
+// то есть ещё во время пролёта мимо солнца, задолго до реальных облаков.
+// Клиент увидел это как "белый оттенок усиливается сразу". Теперь небо
+// держится тёмным (SKY_HOLD_END) на весь космический сегмент пути и
+// светлеет только на подходе к настоящей CloudZone.
+const SKY_HOLD_END = 0.4
+const CLOUD_TRANSITION_END = 0.55
+const CLOUD_HOLD_END = 0.65
+
 export function FogController() {
   const { scene } = useThree()
 
   useFrame(() => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
 
-    if (progress < 0.35) {
-      tmpColor.lerpColors(skyColor, cloudColor, progress / 0.35)
-    } else if (progress < 0.65) {
+    if (progress < SKY_HOLD_END) {
+      tmpColor.copy(skyColor)
+    } else if (progress < CLOUD_TRANSITION_END) {
+      const t = (progress - SKY_HOLD_END) / (CLOUD_TRANSITION_END - SKY_HOLD_END)
+      tmpColor.lerpColors(skyColor, cloudColor, t)
+    } else if (progress < CLOUD_HOLD_END) {
       tmpColor.copy(cloudColor)
     } else {
-      tmpColor.lerpColors(cloudColor, groundColor, (progress - 0.65) / 0.35)
+      tmpColor.lerpColors(cloudColor, groundColor, (progress - CLOUD_HOLD_END) / (1 - CLOUD_HOLD_END))
     }
 
     const density = THREE.MathUtils.lerp(0.004, 0.035, Math.sin(progress * Math.PI))
