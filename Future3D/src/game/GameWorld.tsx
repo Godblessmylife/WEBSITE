@@ -1,53 +1,116 @@
+import { useMemo } from 'react'
 import { RigidBody } from '@react-three/rapier'
-import { Island } from './Island'
+import * as THREE from 'three'
 
-interface Landmark {
-  position: [number, number, number]
-  size: [number, number, number]
-  color: string
+// Остров (внешняя модель, экспортированная в масштабе ~18000 условных
+// единиц) визуально "не совпал по высоте" с полом — герой падал сквозь
+// пустоту при входе в игру. Вместо повторной попытки угадать нужный
+// вертикальный сдвиг без возможности проверить в браузере — плоская
+// процедурная земля: гарантированно ровная, коллайдер строго совпадает
+// с видимой геометрией, падать здесь буквально не через что.
+function createSandTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 512
+  const ctx = canvas.getContext('2d')!
+
+  const base = ctx.createLinearGradient(0, 0, 512, 512)
+  base.addColorStop(0, '#e8c583')
+  base.addColorStop(1, '#d1a05e')
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, 512, 512)
+
+  ctx.globalAlpha = 0.18
+  ctx.strokeStyle = '#a97b3f'
+  for (let i = 0; i < 30; i++) {
+    ctx.lineWidth = 2 + Math.random() * 3
+    const y = Math.random() * 512
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.bezierCurveTo(170, y + (Math.random() * 40 - 20), 340, y + (Math.random() * 40 - 20), 512, y)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(10, 10)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
 }
 
-// Отдельный простой мир для игры (не переиспользуем город с лендинга,
-// по решению клиента): остров (Island.tsx, модель от клиента) вместо
-// плоской площадки + несколько объектов-ориентиров для навигации.
-const LANDMARKS: Landmark[] = [
-  { position: [4, 1, -3], size: [1.5, 2, 1.5], color: '#5fd4ff' },
-  { position: [-5, 0.75, 2], size: [1, 1.5, 1], color: '#ff9d5c' },
-  { position: [-3, 1.25, -6], size: [1.2, 2.5, 1.2], color: '#3ff5a0' },
+function DesertGround() {
+  const texture = useMemo(() => createSandTexture(), [])
+
+  return (
+    <RigidBody type="fixed" colliders="cuboid">
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]} receiveShadow>
+        <boxGeometry args={[140, 140, 0.5]} />
+        <meshStandardMaterial map={texture} roughness={0.95} />
+      </mesh>
+    </RigidBody>
+  )
+}
+
+function DesertSun() {
+  return (
+    <group position={[35, 45, -45]}>
+      <mesh>
+        <sphereGeometry args={[6, 24, 24]} />
+        <meshBasicMaterial color="#ffdca0" toneMapped={false} />
+      </mesh>
+      <directionalLight intensity={2.4} color="#ffe9c2" castShadow />
+    </group>
+  )
+}
+
+function Frond({ angle }: { angle: number }) {
+  return (
+    <group rotation={[0, angle, 0]}>
+      <mesh position={[0, -0.3, 0.9]} rotation={[0.95, 0, 0]}>
+        <boxGeometry args={[0.35, 1.6, 0.05]} />
+        <meshStandardMaterial color="#3f8f4a" roughness={0.7} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  )
+}
+
+function PalmTree({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 1.6, 0]}>
+        <cylinderGeometry args={[0.12, 0.2, 3.2, 8]} />
+        <meshStandardMaterial color="#7a5230" roughness={0.9} />
+      </mesh>
+      <group position={[0, 3.2, 0]}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <Frond key={i} angle={(i / 6) * Math.PI * 2} />
+        ))}
+      </group>
+    </group>
+  )
+}
+
+const PALM_POSITIONS: [number, number, number][] = [
+  [4, 0, -3],
+  [-5, 0, 2],
+  [-3, 0, -6],
+  [7, 0, 4],
+  [-8, 0, -2],
+  [2, 0, 8],
 ]
 
 export function GameWorld() {
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 15, 5]} intensity={1.3} castShadow />
+      <ambientLight intensity={0.7} color="#ffe9c2" />
+      <DesertSun />
 
-      <Island />
+      <DesertGround />
 
-      {/* Невидимая страховка ниже острова: без рендера не могу
-          гарантировать, что видимая поверхность острова точно совпадёт
-          по высоте с (0,0,0) — эта плоскость просто не даст провалиться
-          в пустоту, если модель окажется смещена по Y. */}
-      <RigidBody type="fixed" colliders="cuboid" position={[0, -6, 0]}>
-        <mesh visible={false}>
-          <boxGeometry args={[200, 1, 200]} />
-          <meshBasicMaterial />
-        </mesh>
-      </RigidBody>
-
-      {LANDMARKS.map((landmark, i) => (
-        <RigidBody key={i} type="fixed" colliders="cuboid" position={landmark.position}>
-          <mesh castShadow>
-            <boxGeometry args={landmark.size} />
-            <meshStandardMaterial
-              color={landmark.color}
-              emissive={landmark.color}
-              emissiveIntensity={0.35}
-              roughness={0.4}
-              metalness={0.3}
-            />
-          </mesh>
-        </RigidBody>
+      {PALM_POSITIONS.map((position, i) => (
+        <PalmTree key={i} position={position} />
       ))}
     </>
   )
