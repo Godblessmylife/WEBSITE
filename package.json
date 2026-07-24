@@ -7,10 +7,12 @@
     "dev": "vite Future3D",
     "build": "vite build Future3D",
     "preview": "vite preview Future3D",
-    "typecheck": "tsc --noEmit -p Future3D/tsconfig.json"
+    "typecheck": "tsc --noEmit -p Future3D/tsconfig.json",
+    "postinstall": "node scripts/fix-rapier-wasm-url.cjs"
   },
   "dependencies": {
     "24": "^0.0.0",
+    "@dimforge/rapier3d-compat": "^0.12.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/orbitron": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
