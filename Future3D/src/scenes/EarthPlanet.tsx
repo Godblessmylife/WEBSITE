@@ -21,8 +21,8 @@ const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной �
 // проявляется поверх неё в конце (см. FADE_OUT_START/END ниже и
 // зеркальный fade-in в GroundZone.tsx) — единое место, а не два
 // разных "низа".
-const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
-const PLANET_RADIUS = 45
+export const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
+export const PLANET_RADIUS = 45
 const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
 const FADE_OUT_START = 0.82
 const FADE_OUT_END = 0.94

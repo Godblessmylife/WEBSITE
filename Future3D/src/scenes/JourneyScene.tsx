@@ -4,6 +4,7 @@ import { FogController } from './FogController'
 import { SceneLighting } from './SceneLighting'
 import { SkyZone } from './SkyZone'
 import { EarthPlanet } from './EarthPlanet'
+import { Satellites } from './Satellites'
 import { CloudZone } from './CloudZone'
 import { GroundZone } from './GroundZone'
 import { Ufos } from './Ufos'
@@ -21,6 +22,7 @@ export function JourneyScene() {
       <SceneLighting />
       <SkyZone />
       <EarthPlanet />
+      <Satellites />
       <CloudZone />
       <GroundZone />
       <Ufos />

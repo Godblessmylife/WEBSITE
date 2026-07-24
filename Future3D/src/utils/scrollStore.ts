@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type Lenis from 'lenis'
+import { inverseEaseProgress } from './scrollEasing'
 
 interface ScrollState {
   progress: number
@@ -19,6 +20,12 @@ export const useScrollStore = create<ScrollState>((set, get) => ({
   scrollToProgress: (target) => {
     const lenis = get().lenis
     if (!lenis) return
-    lenis.scrollTo(target * lenis.limit, { duration: 1.6 })
+    // progress хранится уже смягчённым через easeProgress(rawScroll) —
+    // раньше здесь был линейный пересчёт target*limit, из-за чего кнопки
+    // навигации промахивались мимо нужного места (не совпадало с тем,
+    // где реально окажется этот progress на кривой). Инверсия здесь
+    // возвращает "сырую" scroll-позицию, дающую нужный progress.
+    const rawTarget = inverseEaseProgress(target)
+    lenis.scrollTo(rawTarget * lenis.limit, { duration: 1.6 })
   },
 }))
