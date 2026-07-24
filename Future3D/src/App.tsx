@@ -4,6 +4,9 @@ import { useLenis } from '@/hooks/useLenis'
 import { JourneyScene } from '@/scenes/JourneyScene'
 import { Nav } from '@/components/Nav'
 import { PortfolioCarousel } from '@/components/PortfolioCarousel'
+import { GameEntry } from '@/components/GameEntry'
+import { GameMode } from '@/game/GameMode'
+import { useGameStore } from '@/utils/gameStore'
 import './styles/globals.css'
 
 // Высота скролл-спейсера определяет, сколько реальных пикселей скролла
@@ -15,6 +18,7 @@ const SCROLL_HEIGHT_VH = 1600
 
 export function App() {
   useLenis()
+  const isGameActive = useGameStore((s) => s.isGameActive)
 
   return (
     <>
@@ -30,6 +34,8 @@ export function App() {
         </div>
       </div>
       <PortfolioCarousel />
+      <GameEntry />
+      {isGameActive && <GameMode />}
     </>
   )
 }
