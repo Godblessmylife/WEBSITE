@@ -8,18 +8,24 @@ import earthModelUrl from '../models/earth.glb'
 // earth.glb — модель от клиента (Sketchfab), прогнанная через
 // gltf-transform: конвертация из устаревшего KHR_materials_pbrSpecularGlossiness
 // в metal/rough (современный GLTFLoader его не понимает "из коробки"),
-// плюс сжатие геометрии (meshopt) и текстуры (8192x4096 JPG -> 2048x1024
-// WebP). Итог 22.67 МБ -> 429 КБ. Исходный файл лежит рядом как
-// earth.source.glb и не коммитится (см. .gitignore).
+// плюс сжатие геометрии (meshopt) и текстуры (8192x4096 JPG -> 4096x2048
+// WebP, средний уровень качества по выбору клиента). Итог 22.67 МБ ->
+// 1.47 МБ. Исходный файл лежит рядом как earth.source.glb и не
+// коммитится (см. .gitignore).
 const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной модели (bbox)
 
-// Позиция подобрана так, чтобы планета была хорошо видна издалека в
-// самом начале пути (рядом с солнечной системой) и оставалась под
-// облаками (ниже CloudZone), а к моменту подлёта к земле уже гасла —
-// иначе она визуально спорила бы с плоским городом GroundZone.
+// Земля теперь не гаснет на подлёте, а "перетекает" в город: центр
+// планеты подобран так, что финальная точка камеры (0, 1.6, 0) почти
+// касается её поверхности, поэтому весь конец спуска — это подлёт
+// вплотную к Земле (видна текстура крупным планом), а GroundZone
+// проявляется поверх неё в конце (см. FADE_OUT_START/END ниже и
+// зеркальный fade-in в GroundZone.tsx) — единое место, а не два
+// разных "низа".
 const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
 const PLANET_RADIUS = 45
 const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
+const FADE_OUT_START = 0.82
+const FADE_OUT_END = 0.94
 
 export function EarthPlanet() {
   const { scene } = useGLTF(earthModelUrl)
@@ -31,7 +37,7 @@ export function EarthPlanet() {
     modelRef.current.rotation.y += delta * 0.02
 
     const fadeIn = THREE.MathUtils.smoothstep(progress, 0, 0.05)
-    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, 0.45, 0.6)
+    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
     const opacity = fadeIn * fadeOut
     const visible = opacity > 0.01
 

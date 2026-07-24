@@ -1,6 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { Instances, Instance } from '@react-three/drei'
 import * as THREE from 'three'
+import { useScrollStore } from '@/utils/scrollStore'
+
+// Проявляется поверх Земли ближе к концу пути (см. EarthPlanet.tsx —
+// её fade-out идёт в этом же диапазоне), создавая иллюзию, что город
+// — это просто "приближенный" участок поверхности планеты, а не
+// отдельное место.
+const FADE_IN_START = 0.74
+const FADE_IN_END = 0.9
 
 // Текстура окон здания — тёмный фасад с сеткой случайно горящих/тёмных
 // окон (жёлтых и голубых). Общая на все инстансы: индивидуальность
@@ -89,24 +98,52 @@ export function GroundZone() {
   const windowsTexture = useMemo(() => createWindowsTexture(), [])
   const buildings = useMemo(() => generateCity(), [])
 
+  const groundRef = useRef<THREE.Mesh>(null!)
+  const buildingsMaterialRef = useRef<THREE.MeshStandardMaterial>(null!)
+  const warmLightRef = useRef<THREE.PointLight>(null!)
+  const coolLightRef = useRef<THREE.PointLight>(null!)
+
+  useFrame(() => {
+    const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
+    const opacity = THREE.MathUtils.smoothstep(progress, FADE_IN_START, FADE_IN_END)
+    const visible = opacity > 0.01
+
+    const groundMaterial = groundRef.current.material as THREE.MeshStandardMaterial
+    groundMaterial.transparent = opacity < 1
+    groundMaterial.opacity = opacity
+    groundRef.current.visible = visible
+
+    buildingsMaterialRef.current.transparent = opacity < 1
+    buildingsMaterialRef.current.opacity = opacity
+
+    warmLightRef.current.intensity = 90 * opacity
+    coolLightRef.current.intensity = 50 * opacity
+  })
+
   return (
     <group position={[0, 0, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={groundRef} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[260, 260]} />
         <meshStandardMaterial color="#10161f" roughness={0.7} metalness={0.15} />
       </mesh>
 
       <Instances limit={buildings.length} range={buildings.length}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial map={windowsTexture} roughness={0.55} metalness={0.25} vertexColors />
+        <meshStandardMaterial
+          ref={buildingsMaterialRef}
+          map={windowsTexture}
+          roughness={0.55}
+          metalness={0.25}
+          vertexColors
+        />
         {buildings.map((b, i) => (
           <Instance key={i} position={b.position} scale={b.scale} color={b.color} />
         ))}
       </Instances>
 
       {/* тёплый/холодный акцентный свет "заката" и "неона" у горизонта */}
-      <pointLight color="#ff9d5c" position={[0, 12, -60]} intensity={90} distance={170} decay={2} />
-      <pointLight color="#5fd4ff" position={[0, 8, 55]} intensity={50} distance={130} decay={2} />
+      <pointLight ref={warmLightRef} color="#ff9d5c" position={[0, 12, -60]} distance={170} decay={2} />
+      <pointLight ref={coolLightRef} color="#5fd4ff" position={[0, 8, 55]} distance={130} decay={2} />
     </group>
   )
 }
