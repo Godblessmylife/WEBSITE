@@ -1,7 +1,7 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing'
-import { BlendFunction, type ChromaticAberrationEffect } from 'postprocessing'
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
+import { BlendFunction, ChromaticAberrationEffect } from 'postprocessing'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
@@ -19,8 +19,40 @@ import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 const MAX_OFFSET = 0.006
 const VELOCITY_DIVISOR = 60
 
+// РАНЬШЕ здесь был <ChromaticAberration ref={effectRef} .../> из
+// @react-three/postprocessing — это реально ронялО ВСЮ страницу в
+// чёрный экран, а не только игру. Причина: @react-three/postprocessing
+// оборачивает каждый эффект функцией вида
+// `({blendFunction, opacity, ...rest}) => useMemo(() => [...], [JSON.stringify(rest)])`
+// — обычным компонентом-функцией, не через forwardRef. В React 19
+// `ref` теперь передаётся в props как обычное поле ("ref as a prop"),
+// поэтому `effectRef` попадал в `rest` и на КАЖДЫЙ повторный рендер
+// этого компонента библиотека вызывала `JSON.stringify(rest)` для
+// useMemo-зависимости. После первого рендера `effectRef.current` — уже
+// живой инстанс эффекта с внутренними цикличными ссылками (`parent`/
+// `children`) => `JSON.stringify` кидает `TypeError: Converting
+// circular structure to JSON`. Само по себе это не стреляло, пока
+// что-то не вызывало повторный рендер ВСЕГО дерева — а нажатие
+// START делает ровно это (isGameActive в App -> ре-рендер всего
+// поддерева, включая JourneyScene/Effects). Ошибка была необработанной
+// (Error Boundary есть только вокруг игры, не вокруг всего сайта) —
+// падало всё React-дерево целиком, экран становился чёрным.
+//
+// Исправление: создаём инстанс ChromaticAberrationEffect вручную и
+// монтируем как <primitive> — это тот же класс, что использует
+// обёрнутый компонент (EffectComposer ищет добавленные эффекты по
+// `instanceof Effect` среди детей, а не по тому, как именно они
+// созданы), но без обёртки-функции, спотыкающейся об это React 19.
 function VelocityWarp() {
-  const effectRef = useRef<ChromaticAberrationEffect>(null!)
+  const effect = useMemo(
+    () =>
+      new ChromaticAberrationEffect({
+        blendFunction: BlendFunction.NORMAL,
+        radialModulation: true,
+        modulationOffset: 0.3,
+      }),
+    [],
+  )
   const strengthRef = useRef(0)
 
   useFrame((_, delta) => {
@@ -28,17 +60,10 @@ function VelocityWarp() {
     const target = THREE.MathUtils.clamp(Math.abs(velocity) / VELOCITY_DIVISOR, 0, 1)
     const damp = 1 - Math.exp(-6 * delta)
     strengthRef.current = THREE.MathUtils.lerp(strengthRef.current, target, damp)
-    effectRef.current.offset.set(strengthRef.current * MAX_OFFSET, strengthRef.current * MAX_OFFSET)
+    effect.offset.set(strengthRef.current * MAX_OFFSET, strengthRef.current * MAX_OFFSET)
   })
 
-  return (
-    <ChromaticAberration
-      ref={effectRef}
-      blendFunction={BlendFunction.NORMAL}
-      radialModulation
-      modulationOffset={0.3}
-    />
-  )
+  return <primitive object={effect} />
 }
 
 // Только Bloom по выбору клиента: солнце, метеоры и неоновые окна

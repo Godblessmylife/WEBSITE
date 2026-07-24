@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { RigidBody } from '@react-three/rapier'
+import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 
 // Остров (внешняя модель, экспортированная в масштабе ~18000 условных
@@ -43,8 +43,20 @@ function createSandTexture() {
 function DesertGround() {
   const texture = useMemo(() => createSandTexture(), [])
 
+  // РАНЬШЕ: colliders="cuboid" (авто-генерация коллайдера из mesh).
+  // Диагностика (world.forEachCollider через useRapier()) показала, что
+  // в физическом мире оказывалось 2 RigidBody, но только 1 коллайдер —
+  // капсула персонажа. Коллайдер земли не регистрировался вообще, из-за
+  // чего персонаж падал сквозь пол бесконечно (без единого физического
+  // тела на пути падения). Явный CuboidCollider с теми же размерами/
+  // трансформом, что и видимый mesh, — тот же самый визуальный
+  // результат, но без зависимости от автогенерации.
   return (
-    <RigidBody type="fixed" colliders="cuboid">
+    <RigidBody type="fixed" colliders={false}>
+      {/* Полуразмеры совпадают с необёрнутой геометрией (140x140x0.5 / 2),
+          а не с итоговой видимой ориентацией — коллайдер повёрнут точно
+          так же, как mesh, а не переставлены оси в args. */}
+      <CuboidCollider args={[70, 70, 0.25]} position={[0, -0.25, 0]} rotation={[-Math.PI / 2, 0, 0]} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]} receiveShadow>
         <boxGeometry args={[140, 140, 0.5]} />
         <meshStandardMaterial map={texture} roughness={0.95} />
