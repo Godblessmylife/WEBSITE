@@ -1,6 +1,6 @@
 import { Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { KeyboardControls } from '@react-three/drei'
+import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
 import { Joystick, VirtualButton } from 'ecctrl/input'
@@ -9,6 +9,7 @@ import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
 import { Portal } from './Portal'
+import { GameLoadingScreen } from './GameLoadingScreen'
 
 const KEYBOARD_MAP = [
   { name: 'forward', keys: ['ArrowUp', 'KeyW'] },
@@ -31,7 +32,13 @@ export function GameMode() {
       <Canvas camera={{ fov: 60, near: 0.1, far: 300 }} shadows>
         <color attach="background" args={['#0a1120']} />
         <fog attach="fog" args={['#0a1120', 20, 70]} />
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <Html center>
+              <GameLoadingScreen />
+            </Html>
+          }
+        >
           <Physics>
             <KeyboardControls map={KEYBOARD_MAP}>
               <PlayerCharacter ecctrlRef={ecctrlRef} />

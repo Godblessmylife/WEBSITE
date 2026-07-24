@@ -11,6 +11,8 @@ import { PortfolioCarousel } from '@/components/PortfolioCarousel'
 import { PricingSection } from '@/components/PricingSection'
 import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
+import { GameLoadingScreen } from '@/game/GameLoadingScreen'
+import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { useGameStore } from '@/utils/gameStore'
 import './styles/globals.css'
 
@@ -30,6 +32,7 @@ const SCROLL_HEIGHT_VH = 1600
 export function App() {
   useLenis()
   const isGameActive = useGameStore((s) => s.isGameActive)
+  const setGameActive = useGameStore((s) => s.setGameActive)
 
   return (
     <>
@@ -55,9 +58,11 @@ export function App() {
       <GameEntry />
 
       {isGameActive && (
-        <Suspense fallback={null}>
-          <GameMode />
-        </Suspense>
+        <GameErrorBoundary onExit={() => setGameActive(false)}>
+          <Suspense fallback={<GameLoadingScreen />}>
+            <GameMode />
+          </Suspense>
+        </GameErrorBoundary>
       )}
     </>
   )
