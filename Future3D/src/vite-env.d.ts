@@ -15,6 +15,11 @@ declare module '*.hdr' {
   export default src
 }
 
+declare module '*.exr' {
+  const src: string
+  export default src
+}
+
 declare module '*.glsl' {
   const src: string
   export default src

@@ -14,7 +14,7 @@ export function JourneyScene() {
     <Canvas
       camera={{ fov: 60, near: 0.1, far: 500, position: [0, 60, 0] }}
       gl={{ antialias: true }}
-      style={{ position: 'fixed', inset: 0 }}
+      style={{ width: '100%', height: '100%', display: 'block' }}
     >
       <CameraRig />
       <FogController />

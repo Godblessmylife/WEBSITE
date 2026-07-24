@@ -3,6 +3,7 @@ import '@fontsource/orbitron/500.css'
 import { useLenis } from '@/hooks/useLenis'
 import { JourneyScene } from '@/scenes/JourneyScene'
 import { Nav } from '@/components/Nav'
+import { PortfolioCarousel } from '@/components/PortfolioCarousel'
 import './styles/globals.css'
 
 // Высота скролл-спейсера определяет, сколько реальных пикселей скролла
@@ -17,9 +18,18 @@ export function App() {
 
   return (
     <>
-      <JourneyScene />
       <Nav />
-      <div style={{ height: `${SCROLL_HEIGHT_VH}vh` }} />
+      {/* JourneyScene закреплена (position: sticky) внутри этого спейсера.
+          Пока скроллим спейсер, 3D-сцена стоит на месте на весь экран;
+          как только спейсер заканчивается, sticky сама "отпускает" её —
+          сцена естественно уезжает вверх, открывая карусель ниже. Без
+          ручного JS/слежения за скроллом. */}
+      <div style={{ position: 'relative', height: `${SCROLL_HEIGHT_VH}vh` }}>
+        <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
+          <JourneyScene />
+        </div>
+      </div>
+      <PortfolioCarousel />
     </>
   )
 }
