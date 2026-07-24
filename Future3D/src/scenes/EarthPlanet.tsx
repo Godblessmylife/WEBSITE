@@ -1,100 +1,48 @@
-import { useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
+import earthModelUrl from '../models/earth.glb'
 
-// Процедурная текстура-плейсхолдер (океан + "континенты" + полярные
-// шапки + лёгкая облачность), нарисованная на canvas. Не настоящая
-// карта Земли — если клиент пришлёт реальные текстуры/модель планеты,
-// это заменяется одной строкой (map={realTexture} вместо createEarthTexture()).
-function createEarthTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')!
+// earth.glb — модель от клиента (Sketchfab), прогнанная через
+// gltf-transform: конвертация из устаревшего KHR_materials_pbrSpecularGlossiness
+// в metal/rough (современный GLTFLoader его не понимает "из коробки"),
+// плюс сжатие геометрии (meshopt) и текстуры (8192x4096 JPG -> 2048x1024
+// WebP). Итог 22.67 МБ -> 429 КБ. Исходный файл лежит рядом как
+// earth.source.glb и не коммитится (см. .gitignore).
+const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной модели (bbox)
 
-  const ocean = ctx.createLinearGradient(0, 0, 0, canvas.height)
-  ocean.addColorStop(0, '#0f3a63')
-  ocean.addColorStop(0.5, '#1f6fa8')
-  ocean.addColorStop(1, '#0f3a63')
-  ctx.fillStyle = ocean
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  ctx.fillStyle = '#3d7a46'
-  const continents = [
-    { x: 90, y: 90, r: 55 },
-    { x: 150, y: 160, r: 40 },
-    { x: 260, y: 70, r: 45 },
-    { x: 300, y: 150, r: 60 },
-    { x: 380, y: 200, r: 35 },
-    { x: 440, y: 90, r: 50 },
-  ]
-  for (const c of continents) {
-    ctx.beginPath()
-    const points = 10
-    for (let i = 0; i <= points; i++) {
-      const angle = (i / points) * Math.PI * 2
-      const radius = c.r * (0.7 + Math.random() * 0.5)
-      const x = c.x + Math.cos(angle) * radius
-      const y = c.y + Math.sin(angle) * radius * 0.6
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    }
-    ctx.closePath()
-    ctx.fill()
-  }
-
-  ctx.fillStyle = '#eef6ff'
-  ctx.fillRect(0, 0, canvas.width, 12)
-  ctx.fillRect(0, canvas.height - 12, canvas.width, 12)
-
-  ctx.globalAlpha = 0.22
-  ctx.fillStyle = '#ffffff'
-  for (let i = 0; i < 20; i++) {
-    ctx.beginPath()
-    ctx.ellipse(
-      Math.random() * canvas.width,
-      Math.random() * canvas.height,
-      25 + Math.random() * 45,
-      8 + Math.random() * 12,
-      0,
-      0,
-      Math.PI * 2,
-    )
-    ctx.fill()
-  }
-  ctx.globalAlpha = 1
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
-// Позиция подобрана так, чтобы шар был хорошо виден издалека в самом
-// начале пути (рядом с солнечной системой) и оставался под облаками
-// (ниже CloudZone), а к моменту подлёта к земле уже гас — иначе он
-// визуально спорил бы с плоским городом GroundZone.
+// Позиция подобрана так, чтобы планета была хорошо видна издалека в
+// самом начале пути (рядом с солнечной системой) и оставалась под
+// облаками (ниже CloudZone), а к моменту подлёта к земле уже гасла —
+// иначе она визуально спорила бы с плоским городом GroundZone.
 const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
 const PLANET_RADIUS = 45
+const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
 
 export function EarthPlanet() {
-  const texture = useMemo(() => createEarthTexture(), [])
-  const surfaceRef = useRef<THREE.Mesh>(null!)
+  const { scene } = useGLTF(earthModelUrl)
+  const modelRef = useRef<THREE.Group>(null!)
   const atmoRef = useRef<THREE.Mesh>(null!)
 
   useFrame((_, delta) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
-    surfaceRef.current.rotation.y += delta * 0.02
+    modelRef.current.rotation.y += delta * 0.02
 
     const fadeIn = THREE.MathUtils.smoothstep(progress, 0, 0.05)
     const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, 0.45, 0.6)
     const opacity = fadeIn * fadeOut
     const visible = opacity > 0.01
 
-    const surfaceMaterial = surfaceRef.current.material as THREE.MeshStandardMaterial
-    surfaceMaterial.opacity = opacity
-    surfaceMaterial.transparent = opacity < 1
-    surfaceMaterial.visible = visible
+    modelRef.current.visible = visible
+    modelRef.current.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshStandardMaterial
+        material.transparent = opacity < 1
+        material.opacity = opacity
+      }
+    })
 
     const atmosphereMaterial = atmoRef.current.material as THREE.MeshBasicMaterial
     atmosphereMaterial.opacity = opacity * 0.4
@@ -103,10 +51,9 @@ export function EarthPlanet() {
 
   return (
     <group position={PLANET_CENTER}>
-      <mesh ref={surfaceRef}>
-        <sphereGeometry args={[PLANET_RADIUS, 48, 48]} />
-        <meshStandardMaterial map={texture} roughness={0.85} metalness={0} transparent />
-      </mesh>
+      <group ref={modelRef} scale={MODEL_SCALE}>
+        <primitive object={scene} />
+      </group>
       <mesh ref={atmoRef} scale={1.04}>
         <sphereGeometry args={[PLANET_RADIUS, 48, 48]} />
         <meshBasicMaterial
@@ -120,3 +67,5 @@ export function EarthPlanet() {
     </group>
   )
 }
+
+useGLTF.preload(earthModelUrl)

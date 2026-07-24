@@ -10,3 +10,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 *.log
+
+# Необработанные исходники 3D-моделей (десятки МБ, ужимаются через
+# gltf-transform в src/models/*.glb перед использованием на сайте) -
+# в репозиторий идёт только оптимизированный результат.
+*.source.glb
+*.source.fbx
+*.source.obj
