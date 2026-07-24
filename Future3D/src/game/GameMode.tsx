@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { KeyboardControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
+import { Joystick, VirtualButton } from 'ecctrl/input'
 import { useGameStore } from '@/utils/gameStore'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
@@ -58,6 +59,13 @@ export function GameMode() {
       >
         Выход
       </button>
+
+      {/* Тач-управление: DOM-оверлей от ecctrl, сам пишет в общий стор
+          движения — Ecctrl слушает его наравне с клавиатурой, отдельно
+          прокидывать джойстик в контроллер не нужно. На десктопе не
+          мешает (в углу экрана, WASD работает как обычно). */}
+      <Joystick />
+      <VirtualButton id="jump" label="Прыжок" />
     </div>
   )
 }

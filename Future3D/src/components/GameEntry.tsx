@@ -53,8 +53,14 @@ function StartPlate({ onActivate }: { onActivate: () => void }) {
     <group ref={groupRef} position={[0, 1.9, 0]}>
       <mesh
         onClick={onActivate}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
+        onPointerOver={() => {
+          setHovered(true)
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => {
+          setHovered(false)
+          document.body.style.cursor = 'auto'
+        }}
       >
         <planeGeometry args={[1.8, 0.56]} />
         <meshBasicMaterial map={texture} transparent toneMapped={false} />
