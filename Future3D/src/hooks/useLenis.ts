@@ -9,6 +9,8 @@ export function useLenis() {
       smoothWheel: true,
     })
 
+    useScrollStore.getState().setLenis(lenis)
+
     lenis.on('scroll', ({ progress, velocity }: { progress: number; velocity: number }) => {
       useScrollStore.getState().setProgress(progress, velocity)
     })

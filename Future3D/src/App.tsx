@@ -1,5 +1,8 @@
+import '@fontsource/orbitron/700.css'
+import '@fontsource/orbitron/500.css'
 import { useLenis } from '@/hooks/useLenis'
 import { JourneyScene } from '@/scenes/JourneyScene'
+import { Nav } from '@/components/Nav'
 import './styles/globals.css'
 
 // Высота скролл-спейсера определяет, сколько реальных пикселей скролла
@@ -12,6 +15,7 @@ export function App() {
   return (
     <>
       <JourneyScene />
+      <Nav />
       <div style={{ height: `${SCROLL_HEIGHT_VH}vh` }} />
     </>
   )
