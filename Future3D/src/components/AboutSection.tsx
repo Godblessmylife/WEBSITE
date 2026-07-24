@@ -1,3 +1,5 @@
+import { SectionStarfield } from './SectionStarfield'
+
 const SERVICES = [
   { title: 'Веб-сайты и лендинги', desc: 'От визитки до сложного многостраничного сайта — быстро, адаптивно, без шаблонов.' },
   { title: '3D и интерактив', desc: 'Сцены, анимации, погружение — как то, через что вы только что пролетели.' },
@@ -10,14 +12,17 @@ export function AboutSection() {
     <section
       id="about"
       style={{
+        position: 'relative',
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         padding: '6rem 1.5rem',
         background: 'radial-gradient(circle at 50% 20%, #101a2e 0%, #05070d 70%)',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ maxWidth: '960px', margin: '0 auto', width: '100%' }}>
+      <SectionStarfield />
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', width: '100%' }}>
         <p
           style={{
             fontFamily: "'Orbitron', sans-serif",

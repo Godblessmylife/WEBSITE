@@ -37,10 +37,11 @@ function createStartTexture() {
   return texture
 }
 
-// Раньше плашка висела на y=1.9 при компьютере высотой ~0.85 — заметный
-// разрыв, из-за которого её было легко не заметить (плюс камера не
-// была явно направлена на неё). Опущена ближе и увеличена.
-const PLATE_Y = 1.15
+// Компьютер увеличен вдвое (клиент попросил сделать больше) — плашка
+// START поднята пропорционально выше, иначе она оказалась бы вровень с
+// увеличенным монитором вместо того, чтобы парить над ним.
+const COMPUTER_SCALE = 2
+const PLATE_Y = 2.6
 
 function StartPlate({ onActivate }: { onActivate: () => void }) {
   const texture = useMemo(() => createStartTexture(), [])
@@ -76,7 +77,7 @@ function StartPlate({ onActivate }: { onActivate: () => void }) {
 
 function Computer() {
   const { scene } = useGLTF(computerModelUrl)
-  return <primitive object={scene} />
+  return <primitive object={scene} scale={COMPUTER_SCALE} />
 }
 
 // Секция после карусели портфолио: компьютер + висящая надпись START.
@@ -104,22 +105,22 @@ export function GameEntry() {
       {/* touchAction: 'none' — иначе на телефоне жест вращения камеры
           (OrbitControls) конкурирует со скроллом страницы через тот же
           палец на канвасе. */}
-      <Canvas camera={{ position: [0, 1.6, 3.6], fov: 45 }} style={{ touchAction: 'none' }}>
+      <Canvas camera={{ position: [0, 2.4, 5.8], fov: 45 }} style={{ touchAction: 'none' }}>
         {/* тот же "игровое меню" фон, что и под карточками портфолио */}
         <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
-        <fog attach="fog" args={['#0a1120', 8, 26]} />
+        <fog attach="fog" args={['#0a1120', 10, 30]} />
 
         <ambientLight intensity={0.6} />
         <directionalLight position={[3, 5, 4]} intensity={1.3} />
-        <pointLight position={[0, 2, 1]} color="#5fd4ff" intensity={2} distance={6} />
+        <pointLight position={[0, 2.5, 1]} color="#5fd4ff" intensity={2.5} distance={9} />
         <Computer />
         <StartPlate onActivate={() => setGameActive(true)} />
 
         <OrbitControls
-          target={[0, PLATE_Y, 0]}
+          target={[0, 1.5, 0]}
           enablePan={false}
-          minDistance={1.5}
-          maxDistance={6}
+          minDistance={2.5}
+          maxDistance={9}
           minPolarAngle={Math.PI / 4}
           maxPolarAngle={Math.PI / 1.7}
         />
