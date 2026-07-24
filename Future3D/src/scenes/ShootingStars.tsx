@@ -2,8 +2,10 @@ import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 
 const METEOR_COUNT = 10
+const METEOR_COUNT_MOBILE = 5
 
 function randomSpawn() {
   return new THREE.Vector3(
@@ -39,9 +41,12 @@ function Meteor({ speed }: { speed: number }) {
 // Метеорный дождь ("звездопад") в зоне неба: несколько частиц с хвостом
 // (drei Trail) непрерывно летят по диагонали и переспавниваются.
 export function ShootingStars() {
+  const isTouch = useIsTouchDevice()
+  const count = isTouch ? METEOR_COUNT_MOBILE : METEOR_COUNT
+
   return (
     <>
-      {Array.from({ length: METEOR_COUNT }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <Meteor key={i} speed={10 + (i % 5) * 2} />
       ))}
     </>

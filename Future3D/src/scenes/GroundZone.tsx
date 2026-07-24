@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 
 // Проявляется поверх Земли ближе к концу пути (см. EarthPlanet.tsx —
 // её fade-out идёт в этом же диапазоне), создавая иллюзию, что город
@@ -63,7 +64,13 @@ function hash(x: number, z: number) {
 // инстанс-окраски), минус производительность инстансинга, зато без
 // всяких сюрпризов с нормалями/матрицами на неоднородном масштабе.
 // Раскладка также сделана менее хаотичной (меньше джиттер).
-function generateCity(): BuildingSpec[] {
+// Каждое здание — отдельный mesh+material, то есть отдельный draw call
+// (см. комментарий выше про отказ от инстансинга) — на телефонах, где
+// накладные расходы на draw call ощутимо выше, чем на десктопном GPU,
+// это easily самая дорогая часть JourneyScene. thinOut прорежает сетку
+// зданий вдвое (пропуская каждую вторую ячейку), не трогая раскладку
+// оставшихся — город остаётся тем же городом, просто менее плотным.
+function generateCity(thinOut: boolean): BuildingSpec[] {
   const buildings: BuildingSpec[] = []
   const half = 8
   const spacing = 7.5
@@ -72,6 +79,8 @@ function generateCity(): BuildingSpec[] {
 
   for (let ix = -half; ix <= half; ix++) {
     for (let iz = -half; iz <= half; iz++) {
+      if (thinOut && (ix + iz) % 2 !== 0) continue
+
       const h = hash(ix, iz)
       const jitterX = (hash(ix, iz + 0.5) - 0.5) * 1.4
       const jitterZ = (hash(ix + 0.5, iz) - 0.5) * 1.4
@@ -125,8 +134,9 @@ function Building({
 }
 
 export function GroundZone() {
+  const isTouch = useIsTouchDevice()
   const windowsTexture = useMemo(() => createWindowsTexture(), [])
-  const buildings = useMemo(() => generateCity(), [])
+  const buildings = useMemo(() => generateCity(isTouch), [isTouch])
   const buildingMaterialsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([])
 
   const groundRef = useRef<THREE.Mesh>(null!)

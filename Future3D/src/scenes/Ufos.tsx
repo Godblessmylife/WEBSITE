@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 
 interface UfoConfig {
   radius: number
@@ -11,13 +12,16 @@ interface UfoConfig {
 }
 
 const UFO_COUNT = 4
+// Каждая тарелка тащит свой pointLight — на мобильном вдвое меньше
+// одновременных источников света в сцене.
+const UFO_COUNT_MOBILE = 2
 
-function createFleet(): UfoConfig[] {
-  return Array.from({ length: UFO_COUNT }, (_, i) => ({
+function createFleet(count: number): UfoConfig[] {
+  return Array.from({ length: count }, (_, i) => ({
     radius: 18 + i * 7,
     height: 12 - i * 2.5,
     speed: 0.12 + i * 0.04,
-    phase: (i / UFO_COUNT) * Math.PI * 2,
+    phase: (i / count) * Math.PI * 2,
     scale: 0.8 + ((i * 37) % 5) / 10,
   }))
 }
@@ -66,7 +70,11 @@ function Ufo({ radius, height, speed, phase, scale }: UfoConfig) {
 // добавить). Кружат по независимым орбитам в районе облаков/подлёта к
 // городу; собраны на примитивах (сферы+тор), без внешних моделей.
 export function Ufos() {
-  const fleet = useMemo(() => createFleet(), [])
+  const isTouch = useIsTouchDevice()
+  const fleet = useMemo(
+    () => createFleet(isTouch ? UFO_COUNT_MOBILE : UFO_COUNT),
+    [isTouch],
+  )
 
   return (
     <group position={[0, 18, 10]}>

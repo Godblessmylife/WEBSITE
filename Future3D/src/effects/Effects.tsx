@@ -4,6 +4,7 @@ import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-thr
 import { BlendFunction, type ChromaticAberrationEffect } from 'postprocessing'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 
 // scrollStore уже считал velocity (Lenis отдаёт её с самого начала) —
 // она нигде не использовалась. Здесь — единственное место на сайте,
@@ -48,12 +49,30 @@ function VelocityWarp() {
 // в зоне облаков засвечивался Bloom'ом целиком — это и была "белая
 // вспышка". Порог поднят выше яркости фона, чтобы Bloom реагировал
 // только на настоящие яркие объекты, а не на светлое небо/облака.
+//
+// На тач-устройствах (см. useIsTouchDevice) убран VelocityWarp
+// (отдельный полноэкранный проход хроматической аберрации — самый
+// необязательный из трёх эффектов, чисто декоративный) и mipmapBlur у
+// Bloom (даёт мягче свечение, но считает несколько уровней даунсемпла
+// на кадр) — постобработка на полный экран в 1.5x DPR на телефоне и
+// так не бесплатна.
 export function Effects() {
-  return (
-    <EffectComposer>
-      <Bloom mipmapBlur luminanceThreshold={0.92} luminanceSmoothing={0.15} intensity={1.6} />
-      <VelocityWarp />
-      <Vignette offset={0.25} darkness={0.6} />
-    </EffectComposer>
-  )
+  const isTouch = useIsTouchDevice()
+
+  // EffectComposer типизирован на JSX.Element | JSX.Element[] (не
+  // принимает null в детях) — эффекты собираются в массив, а не
+  // условным {isTouch ? null : ...} прямо в JSX.
+  const children = [
+    <Bloom
+      key="bloom"
+      mipmapBlur={!isTouch}
+      luminanceThreshold={0.92}
+      luminanceSmoothing={0.15}
+      intensity={1.6}
+    />,
+    ...(isTouch ? [] : [<VelocityWarp key="warp" />]),
+    <Vignette key="vignette" offset={0.25} darkness={0.6} />,
+  ]
+
+  return <EffectComposer>{children}</EffectComposer>
 }

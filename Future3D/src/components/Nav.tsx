@@ -52,7 +52,11 @@ const navStyle: CSSProperties = {
   justifyContent: 'center',
   flexWrap: 'wrap',
   gap: '0.75rem',
-  padding: '1.5rem',
+  // env(safe-area-inset-*) — отступ под чёлку/шторку iOS в альбомной
+  // ориентации и жестовую панель снизу; на устройствах без выемки
+  // (и на десктопе) эти env()-функции возвращают 0, так что это ничего
+  // не меняет вне iOS.
+  padding: 'calc(1.5rem + env(safe-area-inset-top)) calc(1.5rem + env(safe-area-inset-right)) 1.5rem calc(1.5rem + env(safe-area-inset-left))',
   pointerEvents: 'none',
 }
 
@@ -66,8 +70,19 @@ const buttonStyle: CSSProperties = {
   background: 'rgba(15, 22, 32, 0.45)',
   border: '1px solid rgba(95, 212, 255, 0.4)',
   borderRadius: '999px',
+  // 0.6rem вертикального паддинга при 0.75rem шрифте — это ~28px
+  // высоты, меньше рекомендуемых ~44px для тач-целей (Apple HIG/
+  // Material). minHeight добивает до этого без изменения вида на
+  // десктопе, где кнопка и так шире пальца-курсора.
   padding: '0.6rem 1.25rem',
+  minHeight: '2.75rem',
+  display: 'inline-flex',
+  alignItems: 'center',
   backdropFilter: 'blur(8px)',
   cursor: 'pointer',
+  // Без этого мобильный браузер ждёт ~300мс после тапа (проверяет,
+  // не будет ли двойного тапа для зума) — на кнопках навигации это
+  // ощущается как лаг перед реакцией на нажатие.
+  touchAction: 'manipulation',
   transition: 'background 0.2s ease, border-color 0.2s ease',
 }

@@ -5,6 +5,7 @@ import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
 import { Joystick, VirtualButton } from 'ecctrl/input'
 import { useGameStore } from '@/utils/gameStore'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
@@ -26,10 +27,19 @@ const KEYBOARD_MAP = [
 export function GameMode() {
   const setGameActive = useGameStore((s) => s.setGameActive)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
+  const isTouch = useIsTouchDevice()
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
-      <Canvas camera={{ fov: 60, near: 0.1, far: 300 }} shadows>
+      {/* Тени (shadow map + рендер каждого объекта в него ещё раз)
+          отключены на тач-устройствах — на телефоне это одна из самых
+          дорогих фич рендера, а тут всего одна DesertSun с castShadow,
+          так что без них мир не станет менее читаемым. */}
+      <Canvas
+        camera={{ fov: 60, near: 0.1, far: 300 }}
+        dpr={isTouch ? [1, 1.5] : [1, 2]}
+        shadows={!isTouch}
+      >
         <color attach="background" args={['#0a1120']} />
         <fog attach="fog" args={['#0a1120', 20, 70]} />
         <Suspense
@@ -54,15 +64,17 @@ export function GameMode() {
         onClick={() => setGameActive(false)}
         style={{
           position: 'absolute',
-          top: '1.5rem',
-          right: '1.5rem',
+          top: 'calc(1.5rem + env(safe-area-inset-top))',
+          right: 'calc(1.5rem + env(safe-area-inset-right))',
           padding: '0.6rem 1.4rem',
+          minHeight: '2.75rem',
           background: 'rgba(10, 17, 32, 0.6)',
           border: '1px solid rgba(95, 212, 255, 0.6)',
           borderRadius: '999px',
           color: '#eafcff',
           fontFamily: "'Orbitron', sans-serif",
           cursor: 'pointer',
+          touchAction: 'manipulation',
           zIndex: 1001,
         }}
       >

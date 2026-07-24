@@ -101,7 +101,10 @@ export function GameEntry() {
           'radial-gradient(circle at 50% 38%, #182a45 0%, #0a1120 45%, #05070d 85%)',
       }}
     >
-      <Canvas camera={{ position: [0, 1.6, 3.6], fov: 45 }}>
+      {/* touchAction: 'none' — иначе на телефоне жест вращения камеры
+          (OrbitControls) конкурирует со скроллом страницы через тот же
+          палец на канвасе. */}
+      <Canvas camera={{ position: [0, 1.6, 3.6], fov: 45 }} style={{ touchAction: 'none' }}>
         {/* тот же "игровое меню" фон, что и под карточками портфолио */}
         <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
         <fog attach="fog" args={['#0a1120', 8, 26]} />

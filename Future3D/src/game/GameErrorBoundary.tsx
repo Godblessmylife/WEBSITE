@@ -53,6 +53,8 @@ export class GameErrorBoundary extends Component<Props, State> {
               borderRadius: '999px',
               color: '#eafcff',
               cursor: 'pointer',
+              minHeight: '2.75rem',
+              touchAction: 'manipulation',
             }}
           >
             Выход

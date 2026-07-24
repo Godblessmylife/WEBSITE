@@ -12,6 +12,15 @@ body,
 body {
   background: #05070d;
   overflow-x: hidden;
+  /* Резиновый оттяг/pull-to-refresh на мобильных браузерах (особенно
+     iOS Safari) конфликтует с закреплённым (position: sticky) 3D-канвасом
+     в начале страницы — на границе скролла страница дополнительно
+     "оттягивается" браузером поверх уже плавного скролла от Lenis. */
+  overscroll-behavior-y: none;
   font-family: 'Inter', system-ui, sans-serif;
   color: #eafcff;
+  /* Кастомные кнопки на сайте сами показывают hover/active-состояние —
+     без этого iOS/Android поверх них ещё и подсвечивает серым
+     прямоугольником при тапе. */
+  -webkit-tap-highlight-color: transparent;
 }

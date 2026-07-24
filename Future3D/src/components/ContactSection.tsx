@@ -56,6 +56,7 @@ export function ContactSection() {
           textDecoration: 'none',
           fontWeight: 700,
           letterSpacing: '0.05em',
+          touchAction: 'manipulation',
         }}
       >
         Написать в Telegram
