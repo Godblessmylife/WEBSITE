@@ -10,6 +10,8 @@ import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
 import { Portal } from './Portal'
+import { Bonuses } from './Bonuses'
+import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { GameLoadingScreen } from './GameLoadingScreen'
 
 const KEYBOARD_MAP = [
@@ -26,6 +28,7 @@ const KEYBOARD_MAP = [
 // третьего лица. Монтируется поверх всего сайта, пока isGameActive.
 export function GameMode() {
   const setGameActive = useGameStore((s) => s.setGameActive)
+  const score = useGameStore((s) => s.score)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
   const isTouch = useIsTouchDevice()
 
@@ -54,11 +57,35 @@ export function GameMode() {
               <PlayerCharacter ecctrlRef={ecctrlRef} />
             </KeyboardControls>
             <GameWorld />
+            <Bonuses ecctrlRef={ecctrlRef} />
             <Portal ecctrlRef={ecctrlRef} onEnter={() => setGameActive(false)} />
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
+        <GameDebugTracker ecctrlRef={ecctrlRef} />
       </Canvas>
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 'calc(1.5rem + env(safe-area-inset-top))',
+          left: 'calc(1.5rem + env(safe-area-inset-left))',
+          padding: '0.6rem 1.4rem',
+          minHeight: '2.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'rgba(10, 17, 32, 0.6)',
+          border: '1px solid rgba(255, 215, 106, 0.6)',
+          borderRadius: '999px',
+          color: '#ffe9b0',
+          fontFamily: "'Orbitron', sans-serif",
+          zIndex: 1001,
+        }}
+      >
+        <span aria-hidden="true">✦</span>
+        {score}
+      </div>
 
       <button
         onClick={() => setGameActive(false)}
@@ -81,12 +108,20 @@ export function GameMode() {
         Выход
       </button>
 
-      {/* Тач-управление: DOM-оверлей от ecctrl, сам пишет в общий стор
-          движения — Ecctrl слушает его наравне с клавиатурой, отдельно
-          прокидывать джойстик в контроллер не нужно. На десктопе не
-          мешает (в углу экрана, WASD работает как обычно). */}
+      {/* Тач-управление: DOM-оверлей, пишет в useJoystickStore/
+          useButtonStore (ecctrl/input). ВАЖНО: сам Ecctrl эти сторы не
+          читает — раньше здесь было утверждение, что читает, и клавиатура
+          была настроена ровно так же ошибочно (через drei
+          KeyboardControls, которую Ecctrl тоже не слушает сам). И то,
+          и другое приходится опрашивать вручную и передавать через
+          handle.setMovement() — см. PlayerCharacter.tsx. */}
       <Joystick />
       <VirtualButton id="jump" label="Прыжок" />
+
+      {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована
+          до конца. Убрать (или спрятать за флагом), когда перестанет
+          быть нужен. */}
+      <GameDebugHUD />
     </div>
   )
 }
