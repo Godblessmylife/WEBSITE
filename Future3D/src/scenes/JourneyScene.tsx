@@ -9,6 +9,7 @@ import { CloudZone } from './CloudZone'
 import { GroundZone } from './GroundZone'
 import { Ufos } from './Ufos'
 import { SpaceTravelEffect } from './SpaceTravelEffect'
+import { FloatingClock } from './FloatingClock'
 import { Effects } from '@/effects/Effects'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 
@@ -38,6 +39,7 @@ export function JourneyScene() {
       <GroundZone />
       <Ufos />
       <SpaceTravelEffect />
+      <FloatingClock />
       <Effects />
     </Canvas>
   )

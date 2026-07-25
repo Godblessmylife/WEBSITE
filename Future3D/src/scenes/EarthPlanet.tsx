@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -24,19 +24,52 @@ const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной �
 export const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
 export const PLANET_RADIUS = 45
 const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
-const FADE_OUT_START = 0.82
-const FADE_OUT_END = 0.94
+export const FADE_OUT_START = 0.9
+export const FADE_OUT_END = 0.97
+
+// Раньше Земля появлялась по прогрессу скролла (0-0.05 — практически
+// мгновенно), пока камера была ещё в 80-100 юнитах от неё. На таком
+// расстоянии экспоненциальный туман сцены (FogController, density до
+// 0.035) даёт коэффициент тумана под 0.95+ — планета не пряталась, а
+// рендерилась сплошным засвеченным пятном ЦВЕТА ТУМАНА (белым/облачным
+// в этой фазе пути) поверх реальной текстуры: отсюда и "белая
+// туманность" вместо планеты, и "плоская" (никакого объёма не видно
+// сквозь такую засветку). Два независимых исправления:
+//  1) fog=false на материалах Земли/атмосферы — обычный туман сцены
+//     предназначен для ближнего воздуха/облаков, а не далёкой планеты;
+//     Земля рендерится с полным контрастом собственного освещения
+//     независимо от тумана между камерой и остальной сценой.
+//  2) появление завязано на РЕАЛЬНОЕ расстояние камера->центр планеты,
+//     а не на прогресс скролла — так "проявление" физически совпадает
+//     с моментом настоящего приближения, а не происходит на глазок.
+//
+// Пороги подобраны по реальной выборке cameraPath.getPointAt (шаг
+// 0.025 по всей длине пути, посчитано отдельным скриптом): дистанция
+// опускается ниже 72 около progress~0.705 и ниже 54 около progress~0.865
+// — то есть раскрытие идёт примерно на 0.705-0.865, до начала
+// FADE_OUT_START (0.9), без наложения одного на другое.
+export const REVEAL_FAR_DISTANCE = 72
+export const REVEAL_NEAR_DISTANCE = 54
 
 export function EarthPlanet() {
   const { scene } = useGLTF(earthModelUrl)
   const modelRef = useRef<THREE.Group>(null!)
   const atmoRef = useRef<THREE.Mesh>(null!)
 
-  useFrame((_, delta) => {
+  useEffect(() => {
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        ;(child.material as THREE.MeshStandardMaterial).fog = false
+      }
+    })
+  }, [scene])
+
+  useFrame((state, delta) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
     modelRef.current.rotation.y += delta * 0.02
 
-    const fadeIn = THREE.MathUtils.smoothstep(progress, 0, 0.05)
+    const distance = state.camera.position.distanceTo(PLANET_CENTER)
+    const fadeIn = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
     const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
     const opacity = fadeIn * fadeOut
     const visible = opacity > 0.01
@@ -68,6 +101,7 @@ export function EarthPlanet() {
           opacity={0.3}
           side={THREE.BackSide}
           depthWrite={false}
+          fog={false}
         />
       </mesh>
     </group>

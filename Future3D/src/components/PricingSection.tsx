@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { SectionStarfield } from './SectionStarfield'
+import { useScrollStore } from '@/utils/scrollStore'
 
 interface Tier {
   name: string
@@ -47,9 +49,28 @@ const TIERS: Tier[] = [
 // вместо чисто визуальных эффектов) — превращать цены в WebGL-текстуры
 // убрало бы это. Визуально даёт тот же "зеркальный" эффект без потери
 // текста.
+//
+// Кликабельны: ведут к контактам (#contact) — самое естественное
+// действие после выбора тарифа. Конкретное место назначения не было
+// указано явно, при другом ожидании — легко поменять одну строку.
 function TierCard({ tier }: { tier: Tier }) {
+  const [hovered, setHovered] = useState(false)
+
+  const goToContact = () => useScrollStore.getState().scrollToElement('#contact')
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={goToContact}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          goToContact()
+        }
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
         padding: '2rem 1.5rem',
@@ -63,6 +84,16 @@ function TierCard({ tier }: { tier: Tier }) {
         display: 'flex',
         flexDirection: 'column',
         gap: '0.8rem',
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+        // "Bubble" — карточка будто выплывает к зрителю: масштаб + лёгкий
+        // подъём, а не просто плоское увеличение.
+        transform: hovered ? 'scale(1.1) translateY(-10px)' : 'scale(1) translateY(0)',
+        boxShadow: hovered
+          ? '0 20px 45px rgba(95, 212, 255, 0.35), 0 0 0 1px rgba(255,255,255,0.2) inset'
+          : '0 0 0 rgba(0,0,0,0)',
+        zIndex: hovered ? 2 : 1,
+        transition: 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease',
       }}
     >
       {/* диагональный блик — имитация отражения на металле/стекле */}
@@ -149,7 +180,7 @@ export function PricingSection() {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: '1.5rem',
+            gap: '0.85rem',
           }}
         >
           {TIERS.map((tier) => (

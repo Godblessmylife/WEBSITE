@@ -1,7 +1,14 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { PLANET_CENTER, PLANET_RADIUS } from './EarthPlanet'
+import {
+  PLANET_CENTER,
+  PLANET_RADIUS,
+  FADE_OUT_START,
+  FADE_OUT_END,
+  REVEAL_FAR_DISTANCE,
+  REVEAL_NEAR_DISTANCE,
+} from './EarthPlanet'
 import { useScrollStore } from '@/utils/scrollStore'
 
 interface SatelliteConfig {
@@ -67,10 +74,11 @@ export function Satellites() {
   const fleet = useMemo(() => createFleet(), [])
   const groupRef = useRef<THREE.Group>(null!)
 
-  useFrame(() => {
+  useFrame((state) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
-    const fadeIn = THREE.MathUtils.smoothstep(progress, 0, 0.05)
-    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, 0.82, 0.94)
+    const distance = state.camera.position.distanceTo(PLANET_CENTER)
+    const fadeIn = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
+    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
     groupRef.current.visible = fadeIn * fadeOut > 0.01
   })
 
