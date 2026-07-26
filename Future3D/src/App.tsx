@@ -14,8 +14,10 @@ import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
 import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
+import { JourneyTuner } from '@/components/JourneyTuner'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
+import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
 import './styles/globals.css'
 
 // GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
@@ -23,13 +25,6 @@ import './styles/globals.css'
 // хотя игру запускает не каждый посетитель. lazy() + Suspense выносят
 // это в отдельный chunk, который грузится только по клику на START.
 const GameMode = lazy(() => import('@/game/GameMode').then((m) => ({ default: m.GameMode })))
-
-// Высота скролл-спейсера определяет, сколько реальных пикселей скролла
-// уходит на полный проход камеры от неба до земли (progress 0 -> 1).
-// 500 -> 1000 -> 1600: с каждым запросом клиента путь ощущался слишком
-// быстрым, особенно с учётом добавленных сцен (планета, подлёт к ядру
-// солнечной системы) — им всем нужно место, чтобы раскрыться на скролле.
-const SCROLL_HEIGHT_VH = 1600
 
 export function App() {
   useLenis()
@@ -69,6 +64,8 @@ export function App() {
       )}
 
       {isGalleryOpen && <PortfolioGallery />}
+
+      <JourneyTuner />
     </>
   )
 }

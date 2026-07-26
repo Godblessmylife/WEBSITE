@@ -23,9 +23,13 @@ const BACKGROUND_DIM = 0.55
 // Клиент увидел это как "белый оттенок усиливается сразу". Теперь небо
 // держится тёмным (SKY_HOLD_END) на весь космический сегмент пути и
 // светлеет только на подходе к настоящей CloudZone.
-const SKY_HOLD_END = 0.4
+// Экспортированы (не только локальные const) — JourneyTuner.tsx
+// использует те же границы фаз для подписей зон на ползунке, вместо
+// собственных придуманных на глаз чисел, которые разъехались бы с
+// реальным туманом/цветом при первой же правке одних без других.
+export const SKY_HOLD_END = 0.4
 const CLOUD_TRANSITION_END = 0.55
-const CLOUD_HOLD_END = 0.65
+export const CLOUD_HOLD_END = 0.65
 
 export function FogController() {
   const { scene } = useThree()
@@ -44,7 +48,14 @@ export function FogController() {
       tmpColor.lerpColors(cloudColor, groundColor, (progress - CLOUD_HOLD_END) / (1 - CLOUD_HOLD_END))
     }
 
-    const density = THREE.MathUtils.lerp(0.004, 0.035, Math.sin(progress * Math.PI))
+    // Пик был 0.035 ровно на progress=0.5 (sin(progress*PI) достигает 1
+    // именно там) — это точно совпадает с серединой перехода к светлому
+    // cloudColor (SKY_HOLD_END..CLOUD_TRANSITION_END: 0.4-0.55), то есть
+    // самый плотный туман приходился ровно на самый светлый момент — по
+    // отзыву клиента это читалось как "белая дымка на середине страницы".
+    // Пик снижен почти вдвое — атмосфера облаков ощущается по-прежнему
+    // (не убрана совсем), но не превращается в сплошную засветку экрана.
+    const density = THREE.MathUtils.lerp(0.004, 0.02, Math.sin(progress * Math.PI))
 
     if (!scene.fog) {
       scene.fog = new THREE.FogExp2(tmpColor.getHex(), density)

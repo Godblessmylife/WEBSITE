@@ -19,12 +19,16 @@ export const CAMERA_PATH_POINTS = [
   new THREE.Vector3(0, 1.6, 0),
 ]
 
-export const cameraPath = new THREE.CatmullRomCurve3(
-  CAMERA_PATH_POINTS,
-  false,
-  'catmullrom',
-  0.5,
-)
+// 'centripetal' (а не бывший 'catmullrom'/uniform) — контрольные точки
+// выше расположены очень неравномерно (расстояния между соседними
+// отличаются на порядок), а uniform-параметризация Catmull-Rom для таких
+// точек штатно даёт "cusps and self-intersections" (буквальная
+// формулировка из комментария в исходниках three.js) — сама библиотека
+// поэтому и делает centripetal дефолтом. На сглаживание рывка взгляда
+// у второй точки (см. CameraRig.tsx) это не влияет (проверено численно —
+// разница в пределах погрешности), но для остальной формы пути это
+// объективно корректный выбор, а не "просто дефолт".
+export const cameraPath = new THREE.CatmullRomCurve3(CAMERA_PATH_POINTS, false, 'centripetal')
 
 export const LOOK_AHEAD = 0.02
 

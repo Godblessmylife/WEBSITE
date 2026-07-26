@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useScrollStore } from '@/utils/scrollStore'
 
@@ -5,11 +6,14 @@ import { useScrollStore } from '@/utils/scrollStore'
 // 0-1) — по сути никуда, реального контента там не было. Теперь ведут
 // к настоящим DOM-секциям (см. App.tsx: AboutSection/PricingSection/
 // ContactSection/GameEntry, все с id, совпадающими с anchor ниже).
+//
+// "Игра" убрана по просьбе клиента — вход в игру остаётся только через
+// кнопку START на самой 3D-панели (GameEntry.tsx), без дублирующего
+// пункта в навигации.
 const NAV_ITEMS = [
   { label: 'О нас', anchor: '#about' },
   { label: 'Портфолио', anchor: '#portfolio' },
   { label: 'Цены', anchor: '#pricing' },
-  { label: 'Игра', anchor: '#game' },
   { label: 'Заказать сайт', anchor: '#contact' },
 ]
 
@@ -19,28 +23,37 @@ export function Nav() {
       {NAV_ITEMS.map((item) => (
         <NavButton key={item.label} label={item.label} anchor={item.anchor} />
       ))}
+      <style>{NAV_BUTTON_CSS}</style>
     </nav>
   )
 }
 
+// "Крутая 3D-кнопка будущего": скошенные (не прямоугольные) углы через
+// clip-path вместо привычной таблетки — сразу читается как sci-fi HUD,
+// а не обычная веб-кнопка. Объём даёт псевдоэлемент ::before,
+// сдвинутый вниз-вправо и притемнённый — классический приём "кнопка с
+// толщиной", без реального 3D/Three.js (это обычный DOM-элемент навигации,
+// ему не нужен WebGL-контекст ради эффекта). При наведении кнопка
+// приподнимается к зрителю (translateY + лёгкий наклон по X через
+// perspective) и по ней слева направо пробегает световой блик.
 function NavButton({ label, anchor }: { label: string; anchor: string }) {
+  const [hovered, setHovered] = useState(false)
+
   return (
     <button
-      style={buttonStyle}
+      className="nav-3d-btn"
+      style={hovered ? navButtonHoverStyle : navButtonStyle}
       onClick={() => useScrollStore.getState().scrollToElement(anchor)}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(95, 212, 255, 0.18)'
-        e.currentTarget.style.borderColor = 'rgba(95, 212, 255, 0.9)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(15, 22, 32, 0.45)'
-        e.currentTarget.style.borderColor = 'rgba(95, 212, 255, 0.4)'
-      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {label}
+      <span className="nav-3d-btn-face">{label}</span>
+      <span className="nav-3d-btn-sheen" />
     </button>
   )
 }
+
+const CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
 
 const navStyle: CSSProperties = {
   position: 'fixed',
@@ -51,7 +64,7 @@ const navStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   flexWrap: 'wrap',
-  gap: '0.75rem',
+  gap: '0.9rem',
   // env(safe-area-inset-*) — отступ под чёлку/шторку iOS в альбомной
   // ориентации и жестовую панель снизу; на устройствах без выемки
   // (и на десктопе) эти env()-функции возвращают 0, так что это ничего
@@ -60,29 +73,80 @@ const navStyle: CSSProperties = {
   pointerEvents: 'none',
 }
 
-const buttonStyle: CSSProperties = {
+const navButtonBase: CSSProperties = {
   pointerEvents: 'auto',
+  position: 'relative',
   fontFamily: "'Orbitron', sans-serif",
-  fontSize: '0.75rem',
-  letterSpacing: '0.05em',
+  fontWeight: 700,
+  fontSize: '0.78rem',
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  color: '#e8f6ff',
-  background: 'rgba(15, 22, 32, 0.45)',
-  border: '1px solid rgba(95, 212, 255, 0.4)',
-  borderRadius: '999px',
-  // 0.6rem вертикального паддинга при 0.75rem шрифте — это ~28px
-  // высоты, меньше рекомендуемых ~44px для тач-целей (Apple HIG/
-  // Material). minHeight добивает до этого без изменения вида на
-  // десктопе, где кнопка и так шире пальца-курсора.
-  padding: '0.6rem 1.25rem',
-  minHeight: '2.75rem',
+  color: '#eafcff',
+  border: '1px solid rgba(95, 212, 255, 0.5)',
+  clipPath: CLIP,
+  padding: '0.85rem 1.6rem 0.85rem 1.5rem',
+  minHeight: '2.9rem',
   display: 'inline-flex',
   alignItems: 'center',
-  backdropFilter: 'blur(8px)',
+  justifyContent: 'center',
   cursor: 'pointer',
-  // Без этого мобильный браузер ждёт ~300мс после тапа (проверяет,
-  // не будет ли двойного тапа для зума) — на кнопках навигации это
-  // ощущается как лаг перед реакцией на нажатие.
   touchAction: 'manipulation',
-  transition: 'background 0.2s ease, border-color 0.2s ease',
+  overflow: 'hidden',
+  transition: 'transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3), box-shadow 0.25s ease, border-color 0.25s ease, background 0.3s ease',
 }
+
+const navButtonStyle: CSSProperties = {
+  ...navButtonBase,
+  background: 'linear-gradient(160deg, rgba(22, 34, 50, 0.85), rgba(8, 13, 22, 0.92))',
+  transform: 'perspective(600px) rotateX(0deg) translateY(0) translateZ(0)',
+  boxShadow: '0 3px 0 rgba(95, 212, 255, 0.3), 0 8px 20px rgba(0, 0, 0, 0.45)',
+}
+
+const navButtonHoverStyle: CSSProperties = {
+  ...navButtonBase,
+  background: 'linear-gradient(160deg, rgba(32, 52, 74, 0.92), rgba(10, 18, 30, 0.95))',
+  borderColor: 'rgba(95, 212, 255, 0.95)',
+  transform: 'perspective(600px) rotateX(-9deg) translateY(-4px) translateZ(6px)',
+  boxShadow:
+    '0 3px 0 rgba(95, 212, 255, 0.55), 0 16px 30px rgba(95, 212, 255, 0.25), 0 0 26px rgba(95, 212, 255, 0.4)',
+}
+
+// Псевдоэлементы и keyframes нельзя выразить inline-style в React —
+// тот же приём, что и в остальной игровой/загрузочной UI этого проекта
+// (QuestUI.tsx, Minimap.tsx, GameLoadingScreen.tsx): один общий <style>
+// с классами вместо десятка обёрточных styled-компонентов ради пары
+// правил.
+const NAV_BUTTON_CSS = `
+  .nav-3d-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: ${CLIP};
+    background: linear-gradient(160deg, rgba(95, 212, 255, 0.35), rgba(95, 212, 255, 0));
+    transform: translate(3px, 5px);
+    z-index: -1;
+    opacity: 0.7;
+  }
+  .nav-3d-btn-face {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 10px rgba(95, 212, 255, 0.45);
+  }
+  .nav-3d-btn-sheen {
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transform: skewX(-18deg);
+    transition: left 0.65s ease;
+    pointer-events: none;
+  }
+  .nav-3d-btn:hover .nav-3d-btn-sheen {
+    left: 130%;
+  }
+  .nav-3d-btn:active {
+    transform: perspective(600px) rotateX(-2deg) translateY(1px) translateZ(0) !important;
+  }
+`
