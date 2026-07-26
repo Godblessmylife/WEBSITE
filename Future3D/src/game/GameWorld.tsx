@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
+import { MapProps } from './MapProps'
 
 // Остров (внешняя модель, экспортированная в масштабе ~18000 условных
 // единиц) визуально "не совпал по высоте" с полом — герой падал сквозь
@@ -124,6 +125,8 @@ export function GameWorld() {
       {PALM_POSITIONS.map((position, i) => (
         <PalmTree key={i} position={position} />
       ))}
+
+      <MapProps />
     </>
   )
 }
