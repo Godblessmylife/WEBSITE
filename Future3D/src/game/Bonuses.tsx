@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
 import { useGameStore } from '@/utils/gameStore'
+import { usePerfStore } from '@/utils/perfStore'
 
 const COLLECT_DISTANCE = 1.4
 const SCORE_PER_BONUS = 10
@@ -23,7 +24,7 @@ const BONUS_POSITIONS: [number, number, number][] = [
 
 const bonusWorldPos = new THREE.Vector3()
 
-function BonusOrb({ position }: { position: [number, number, number] }) {
+function BonusOrb({ position, withLight }: { position: [number, number, number]; withLight: boolean }) {
   const groupRef = useRef<THREE.Group>(null!)
   const ringRef = useRef<THREE.Mesh>(null!)
 
@@ -50,7 +51,7 @@ function BonusOrb({ position }: { position: [number, number, number] }) {
         <torusGeometry args={[0.5, 0.04, 8, 24]} />
         <meshBasicMaterial color="#ffe9b0" toneMapped={false} />
       </mesh>
-      <pointLight color="#ffcf7a" intensity={2} distance={4} />
+      {withLight && <pointLight color="#ffcf7a" intensity={2} distance={4} />}
     </group>
   )
 }
@@ -62,6 +63,11 @@ function BonusOrb({ position }: { position: [number, number, number] }) {
 // автоматически на месте — отдельно сбрасывать нечего.
 export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const addScore = useGameStore((s) => s.addScore)
+  // 8 одновременных точечных источников света (по одному на бонус) —
+  // на слабых устройствах/просевшем fps самая дорогая часть этой сцены
+  // после теней. Свечение остаётся (emissive-материал + Bloom), убирается
+  // только настоящий динамический свет.
+  const reduced = usePerfStore((s) => s.reduced)
   const [collected, setCollected] = useState<boolean[]>(() => BONUS_POSITIONS.map(() => false))
   const collectedRef = useRef(collected)
   collectedRef.current = collected
@@ -83,7 +89,9 @@ export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | nul
 
   return (
     <>
-      {BONUS_POSITIONS.map((pos, i) => (collected[i] ? null : <BonusOrb key={i} position={pos} />))}
+      {BONUS_POSITIONS.map((pos, i) =>
+        collected[i] ? null : <BonusOrb key={i} position={pos} withLight={!reduced} />,
+      )}
     </>
   )
 }

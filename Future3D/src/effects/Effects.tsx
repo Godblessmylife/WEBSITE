@@ -4,7 +4,7 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { BlendFunction, ChromaticAberrationEffect } from 'postprocessing'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
-import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { usePerfStore } from '@/utils/perfStore'
 
 // scrollStore уже считал velocity (Lenis отдаёт её с самого начала) —
 // она нигде не использовалась. Здесь — единственное место на сайте,
@@ -75,27 +75,27 @@ function VelocityWarp() {
 // вспышка". Порог поднят выше яркости фона, чтобы Bloom реагировал
 // только на настоящие яркие объекты, а не на светлое небо/облака.
 //
-// На тач-устройствах (см. useIsTouchDevice) убран VelocityWarp
-// (отдельный полноэкранный проход хроматической аберрации — самый
-// необязательный из трёх эффектов, чисто декоративный) и mipmapBlur у
-// Bloom (даёт мягче свечение, но считает несколько уровней даунсемпла
-// на кадр) — постобработка на полный экран в 1.5x DPR на телефоне и
-// так не бесплатна.
+// При reduced (см. utils/perfStore.ts — тач-устройство/мало ядер CPU
+// ИЛИ живой fps просел) убран VelocityWarp (отдельный полноэкранный
+// проход хроматической аберрации — самый необязательный из трёх
+// эффектов, чисто декоративный) и mipmapBlur у Bloom (даёт мягче
+// свечение, но считает несколько уровней даунсемпла на кадр) —
+// постобработка на полный экран и так не бесплатна.
 export function Effects() {
-  const isTouch = useIsTouchDevice()
+  const reduced = usePerfStore((s) => s.reduced)
 
   // EffectComposer типизирован на JSX.Element | JSX.Element[] (не
   // принимает null в детях) — эффекты собираются в массив, а не
-  // условным {isTouch ? null : ...} прямо в JSX.
+  // условным {reduced ? null : ...} прямо в JSX.
   const children = [
     <Bloom
       key="bloom"
-      mipmapBlur={!isTouch}
+      mipmapBlur={!reduced}
       luminanceThreshold={0.92}
       luminanceSmoothing={0.15}
       intensity={1.6}
     />,
-    ...(isTouch ? [] : [<VelocityWarp key="warp" />]),
+    ...(reduced ? [] : [<VelocityWarp key="warp" />]),
     <Vignette key="vignette" offset={0.25} darkness={0.6} />,
   ]
 

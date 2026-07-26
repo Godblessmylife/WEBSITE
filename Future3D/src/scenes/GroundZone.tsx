@@ -3,7 +3,7 @@ import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
-import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { usePerfStore } from '@/utils/perfStore'
 
 // Проявляется поверх Земли ближе к концу пути (см. EarthPlanet.tsx —
 // её fade-out идёт в этом же диапазоне: 0.9-0.97), создавая иллюзию,
@@ -134,9 +134,9 @@ function Building({
 }
 
 export function GroundZone() {
-  const isTouch = useIsTouchDevice()
+  const reduced = usePerfStore((s) => s.reduced)
   const windowsTexture = useMemo(() => createWindowsTexture(), [])
-  const buildings = useMemo(() => generateCity(isTouch), [isTouch])
+  const buildings = useMemo(() => generateCity(reduced), [reduced])
   const buildingMaterialsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([])
 
   const groundRef = useRef<THREE.Mesh>(null!)

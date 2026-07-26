@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { EcctrlHandle } from 'ecctrl'
 import { useGameDebugStore } from '@/utils/gameDebugStore'
+import { usePerfStore } from '@/utils/perfStore'
 
 const MAX_LOGGED_ERRORS = 3
 
@@ -39,6 +40,7 @@ export function GameDebugTracker({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHan
 // рендерится СНАРУЖИ <Canvas>, поэтому не может сам звать useFrame.
 export function GameDebugHUD() {
   const { fps, pos, isMoving, isOnGround, isFalling } = useGameDebugStore()
+  const reduced = usePerfStore((s) => s.reduced)
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
@@ -75,7 +77,7 @@ export function GameDebugHUD() {
       }}
     >
       <div style={{ color: '#5fd4ff' }}>DEBUG</div>
-      <div>fps: {fps}</div>
+      <div>fps: {fps} | качество: {reduced ? 'снижено' : 'полное'}</div>
       <div>pos: {pos}</div>
       <div>
         moving: {String(isMoving)} | ground: {String(isOnGround)} | falling: {String(isFalling)}

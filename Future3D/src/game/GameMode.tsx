@@ -5,7 +5,8 @@ import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
 import { Joystick, VirtualButton } from 'ecctrl/input'
 import { useGameStore } from '@/utils/gameStore'
-import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { usePerfStore } from '@/utils/perfStore'
+import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
@@ -30,19 +31,21 @@ export function GameMode() {
   const setGameActive = useGameStore((s) => s.setGameActive)
   const score = useGameStore((s) => s.score)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
-  const isTouch = useIsTouchDevice()
+  const reduced = usePerfStore((s) => s.reduced)
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
       {/* Тени (shadow map + рендер каждого объекта в него ещё раз)
-          отключены на тач-устройствах — на телефоне это одна из самых
-          дорогих фич рендера, а тут всего одна DesertSun с castShadow,
-          так что без них мир не станет менее читаемым. */}
+          отключены при reduced (тач-устройство/мало ядер CPU ИЛИ живой
+          fps в игре просел — см. utils/perfStore.ts + AdaptivePerformance)
+          — одна из самых дорогих фич рендера, а тут всего одна DesertSun
+          с castShadow, так что без теней мир не станет менее читаемым. */}
       <Canvas
         camera={{ fov: 60, near: 0.1, far: 300 }}
-        dpr={isTouch ? [1, 1.5] : [1, 2]}
-        shadows={!isTouch}
+        dpr={reduced ? [1, 1.5] : [1, 2]}
+        shadows={!reduced}
       >
+        <AdaptivePerformance />
         <color attach="background" args={['#0a1120']} />
         <fog attach="fog" args={['#0a1120', 20, 70]} />
         <Suspense

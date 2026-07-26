@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import * as THREE from 'three'
-import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { usePerfStore } from '@/utils/perfStore'
 
 const METEOR_COUNT = 10
 const METEOR_COUNT_MOBILE = 5
@@ -41,8 +41,8 @@ function Meteor({ speed }: { speed: number }) {
 // Метеорный дождь ("звездопад") в зоне неба: несколько частиц с хвостом
 // (drei Trail) непрерывно летят по диагонали и переспавниваются.
 export function ShootingStars() {
-  const isTouch = useIsTouchDevice()
-  const count = isTouch ? METEOR_COUNT_MOBILE : METEOR_COUNT
+  const reduced = usePerfStore((s) => s.reduced)
+  const count = reduced ? METEOR_COUNT_MOBILE : METEOR_COUNT
 
   return (
     <>

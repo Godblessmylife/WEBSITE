@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { usePerfStore } from '@/utils/perfStore'
 
 interface UfoConfig {
   radius: number
@@ -70,10 +70,10 @@ function Ufo({ radius, height, speed, phase, scale }: UfoConfig) {
 // добавить). Кружат по независимым орбитам в районе облаков/подлёта к
 // городу; собраны на примитивах (сферы+тор), без внешних моделей.
 export function Ufos() {
-  const isTouch = useIsTouchDevice()
+  const reduced = usePerfStore((s) => s.reduced)
   const fleet = useMemo(
-    () => createFleet(isTouch ? UFO_COUNT_MOBILE : UFO_COUNT),
-    [isTouch],
+    () => createFleet(reduced ? UFO_COUNT_MOBILE : UFO_COUNT),
+    [reduced],
   )
 
   return (
