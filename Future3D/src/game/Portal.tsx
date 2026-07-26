@@ -4,23 +4,29 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
+import { useTeleportStore } from '@/utils/teleportStore'
+import { SPACE_TELEPORT_TARGET } from './SpaceZone'
 import portalUrl from '../models/portal.glb'
 
 const PORTAL_POSITION = new THREE.Vector3(10, 0, -10)
 const TRIGGER_DISTANCE = 2
 
-// Портал — декоративный проход (без физического коллайдера, через него
-// специально можно пройти) со своей запечённой анимацией свечения.
-// Подойти вплотную — выход из игры обратно на сайт (портал как "дверь
-// наружу"). Если задумывалось иначе — телепорт внутри мира и т.п. —
-// легко поменять, сама механика уже готова.
-export function Portal({
-  ecctrlRef,
-  onEnter,
-}: {
-  ecctrlRef: RefObject<EcctrlHandle | null>
-  onEnter: () => void
-}) {
+// Полная длительность визуального эффекта в TeleportEffect.tsx (мс) -
+// должна совпадать с суммой длительностей его CSS-анимаций (900ms).
+const EFFECT_DURATION_MS = 900
+// Момент внутри эффекта, когда белая вспышка (teleport-flash-anim) уже
+// практически в максимуме (55-78% от 900ms) - сюда прячем реальное
+// перемещение тела, чтобы "телепортация" не выглядела прыжком экрана.
+const TELEPORT_AT_MS = 650
+
+// Портал — декоративный проход со своей запечённой анимацией свечения.
+// РАНЬШЕ подойти вплотную означало выход из игры обратно на сайт (портал
+// как "дверь наружу"). По просьбе клиента — телепорт героя в космос
+// (SpaceZone.tsx: платформа + звёзды + Земля), с эффектом телепортации
+// ПЕРЕД самим перемещением (TeleportEffect.tsx). Выход из игры теперь
+// только через кнопку "Выход" в HUD (GameMode.tsx) — она работает из
+// любой точки карты независимо от портала.
+export function Portal({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const { scene, animations } = useGLTF(portalUrl)
   const groupRef = useRef<THREE.Group>(null!)
   const { actions, names } = useAnimations(animations, groupRef)
@@ -31,12 +37,35 @@ export function Portal({
     firstAction?.reset().play()
   }, [actions, names])
 
+  useEffect(() => {
+    // Если игрок выходит из игры (GameMode размонтируется) во время
+    // отложенного setTimeout ниже - не трогать чужой (уже отмонтированный)
+    // ecctrlRef.body и не оставлять активным полноэкранный флэш навсегда.
+    return () => useTeleportStore.getState().setActive(false)
+  }, [])
+
   useFrame(() => {
     const handle = ecctrlRef.current
     if (!handle || triggeredRef.current) return
     if (handle.currPos.distanceTo(PORTAL_POSITION) < TRIGGER_DISTANCE) {
       triggeredRef.current = true
-      onEnter()
+      useTeleportStore.getState().setActive(true)
+
+      setTimeout(() => {
+        const h = ecctrlRef.current
+        if (h) {
+          h.body.setTranslation(
+            { x: SPACE_TELEPORT_TARGET.x, y: SPACE_TELEPORT_TARGET.y, z: SPACE_TELEPORT_TARGET.z },
+            true,
+          )
+          h.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+          useTeleportStore.getState().triggerSnap()
+        }
+      }, TELEPORT_AT_MS)
+
+      setTimeout(() => {
+        useTeleportStore.getState().setActive(false)
+      }, EFFECT_DURATION_MS)
     }
   })
 

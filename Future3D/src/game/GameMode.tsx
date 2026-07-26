@@ -18,6 +18,8 @@ import { QuestDialogue, QuestLog } from './QuestUI'
 import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { Minimap, MinimapTracker } from './Minimap'
+import { SpaceZone } from './SpaceZone'
+import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
 
 const KEYBOARD_MAP = [
@@ -73,7 +75,8 @@ export function GameMode() {
             <Bonuses ecctrlRef={ecctrlRef} />
             <QuestNpc />
             <QuestItem ecctrlRef={ecctrlRef} />
-            <Portal ecctrlRef={ecctrlRef} onEnter={() => setGameActive(false)} />
+            <Portal ecctrlRef={ecctrlRef} />
+            <SpaceZone />
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
@@ -163,6 +166,7 @@ export function GameMode() {
 
       <QuestLog />
       <QuestDialogue />
+      <TeleportEffect />
     </div>
   )
 }
