@@ -14,7 +14,7 @@ const DISSOLVE_END = 0.14
 // внизу кадра именно в начале пути, независимо от точной формы
 // cameraPath (не нужно подбирать мировые координаты вручную без
 // возможности посмотреть в браузере).
-const LOCAL_OFFSET = new THREE.Vector3(0, -2.4, -7)
+const LOCAL_OFFSET = new THREE.Vector3(0, -3.2, -7)
 const worldOffset = new THREE.Vector3()
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -28,7 +28,7 @@ function drawClockTexture(canvas: HTMLCanvasElement, now: Date) {
     canvas.width / 2, canvas.height / 2, 0,
     canvas.width / 2, canvas.height / 2, canvas.width / 2,
   )
-  glow.addColorStop(0, 'rgba(95, 212, 255, 0.35)')
+  glow.addColorStop(0, 'rgba(95, 212, 255, 0.15)')
   glow.addColorStop(1, 'rgba(95, 212, 255, 0)')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -93,7 +93,7 @@ export function FloatingClock() {
   return (
     <group ref={groupRef}>
       <mesh>
-        <planeGeometry args={[6, 1.72]} />
+        <planeGeometry args={[3, 0.86]} />
         <meshBasicMaterial
           ref={materialRef}
           map={texture}
