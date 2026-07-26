@@ -17,45 +17,72 @@ const bgColor = new THREE.Color()
 // ощущение "внутри облака".
 const BACKGROUND_DIM = 0.55
 
-// Раньше высветление начиналось с первого же пикселя скролла (progress
-// > 0) и уже полностью доходило до светлого "облачного" тона к 35% —
-// то есть ещё во время пролёта мимо солнца, задолго до реальных облаков.
-// Клиент увидел это как "белый оттенок усиливается сразу". Теперь небо
-// держится тёмным (SKY_HOLD_END) на весь космический сегмент пути и
-// светлеет только на подходе к настоящей CloudZone.
-// Экспортированы (не только локальные const) — JourneyTuner.tsx
-// использует те же границы фаз для подписей зон на ползунке, вместо
-// собственных придуманных на глаз чисел, которые разъехались бы с
-// реальным туманом/цветом при первой же правке одних без других.
-export const SKY_HOLD_END = 0.4
-const CLOUD_TRANSITION_END = 0.55
-export const CLOUD_HOLD_END = 0.65
+// ВТОРАЯ итерация этих порогов. Клиент теперь смотрит на конкретные
+// проценты через JourneyTuner.tsx и сообщил: "начиная с 60% начинается
+// туманность, убрать" — числовая проверка (сэмплирование пути скриптом,
+// с пересчётом через ту же формулу, что и JourneyTuner) показала: при
+// СТАРЫХ порогах (SKY_HOLD_END=0.4) плотность тумана уже была практически
+// на пике именно к progress~0.4 — а это ровно ~57-60% от видимого
+// путешествия. Задача клиента шире, чем просто "подвинуть цифру": весь
+// участок 60-90% должен ощущаться как полёт сквозь открытый космос к
+// планете (см. EarthPlanet.tsx — раскрытие тоже растянуто на этот же
+// диапазон, и SpaceTravelEffect добавлен вторым экземпляром именно сюда),
+// а не как погружение в туман. Пороги сдвинуты так, что тёмное небо
+// держится примерно до 90-93% пути, и лёгкая "облачная" пелена/посадочный
+// туман остаётся только на самом подлёте к городу — там же, где реально
+// стоят объёмные облака (CloudZone.tsx, мировая позиция y=20 — камера
+// проходит этот уровень высоты как раз в эти проценты, см. таблицу в
+// комментарии ниже).
+//
+// ВАЖНО: progress физически не достигает 1.0, пока страница видна —
+// sticky-обёртка отпускает 3D-сцену уже на progress~0.852 (при текущей
+// высоте страницы, см. подробный разбор в scrollStore.ts у
+// scrollToJourneyFraction). Отсюда же обнаружился отдельный, более
+// старый баг: GroundZone.tsx (город) держал FADE_IN_START на 0.88 -
+// ВЫШЕ реально достижимого максимума - город физически не мог
+// появиться ни при каком количестве скролла. Исправлено тут и в
+// GroundZone.tsx/EarthPlanet.tsx согласованно, все пороги теперь ниже
+// 0.852 с запасом.
+//
+// jf% -> progress (при текущей длине страницы): 85%->0.710, 90%->0.761,
+// 95%->0.808, 100%->0.852.
+export const SKY_HOLD_END = 0.75
+const CLOUD_TRANSITION_END = 0.81
+export const CLOUD_HOLD_END = 0.84
+
+// РАНЬШЕ плотность считалась ОТДЕЛЬНОЙ формулой (sin(progress*PI),
+// пик всегда на progress=0.5) — независимо от того, где реально
+// проходит граница цвета. Из-за этого плотность и белый цвет почти
+// никогда не совпадали по времени специально, а иногда (как в первой
+// версии) случайно накладывались друг на друга. Теперь density и
+// tmpColor считаются В ОДНОМ И ТОМ ЖЕ if/else по одним и тем же
+// порогам — они физически не могут разъехаться при следующей правке.
+const SKY_DENSITY = 0.003
+const CLOUD_DENSITY = 0.016
+const GROUND_DENSITY = 0.01
 
 export function FogController() {
   const { scene } = useThree()
 
   useFrame(() => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
+    let density: number
 
     if (progress < SKY_HOLD_END) {
       tmpColor.copy(skyColor)
+      density = SKY_DENSITY
     } else if (progress < CLOUD_TRANSITION_END) {
       const t = (progress - SKY_HOLD_END) / (CLOUD_TRANSITION_END - SKY_HOLD_END)
       tmpColor.lerpColors(skyColor, cloudColor, t)
+      density = THREE.MathUtils.lerp(SKY_DENSITY, CLOUD_DENSITY, t)
     } else if (progress < CLOUD_HOLD_END) {
       tmpColor.copy(cloudColor)
+      density = CLOUD_DENSITY
     } else {
-      tmpColor.lerpColors(cloudColor, groundColor, (progress - CLOUD_HOLD_END) / (1 - CLOUD_HOLD_END))
+      const t = (progress - CLOUD_HOLD_END) / (1 - CLOUD_HOLD_END)
+      tmpColor.lerpColors(cloudColor, groundColor, t)
+      density = THREE.MathUtils.lerp(CLOUD_DENSITY, GROUND_DENSITY, t)
     }
-
-    // Пик был 0.035 ровно на progress=0.5 (sin(progress*PI) достигает 1
-    // именно там) — это точно совпадает с серединой перехода к светлому
-    // cloudColor (SKY_HOLD_END..CLOUD_TRANSITION_END: 0.4-0.55), то есть
-    // самый плотный туман приходился ровно на самый светлый момент — по
-    // отзыву клиента это читалось как "белая дымка на середине страницы".
-    // Пик снижен почти вдвое — атмосфера облаков ощущается по-прежнему
-    // (не убрана совсем), но не превращается в сплошную засветку экрана.
-    const density = THREE.MathUtils.lerp(0.004, 0.02, Math.sin(progress * Math.PI))
 
     if (!scene.fog) {
       scene.fog = new THREE.FogExp2(tmpColor.getHex(), density)

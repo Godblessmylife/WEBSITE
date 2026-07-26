@@ -8,11 +8,17 @@ import { cameraPath } from './cameraPath'
 // путешествие" — окно приурочено к уже существующим константам пути:
 // TRAVEL_PEAK ~0.317 совпадает с реальным ближайшим пролётом мимо
 // солнечной системы (см. cameraPath.ts), TRAVEL_END чуть раньше
-// SKY_HOLD_END (0.4 в FogController) — эффект успевает погаснуть до
-// начала перехода в облака, а не наложиться на него.
-const TRAVEL_START = 0.24
-const TRAVEL_PEAK_END = 0.34
-const TRAVEL_END = 0.42
+// SKY_HOLD_END — эффект успевает погаснуть до начала перехода в облака,
+// а не наложиться на него.
+//
+// Компонент обобщён под props (start/peakEnd/end/color) — по просьбе
+// клиента "приближаться к планете сквозь космос, эффект ускорения"
+// нужен ВТОРОЙ такой же эффект, но на подлёте к Земле (см. JourneyScene.tsx,
+// второй <SpaceTravelEffect> с другим окном progress). Раньше это были
+// захардкоженные модульные константы — само собой, не размножающиеся.
+const DEFAULT_START = 0.24
+const DEFAULT_PEAK_END = 0.34
+const DEFAULT_END = 0.42
 
 const STREAK_COUNT = 90
 const STREAK_RADIUS = 22
@@ -20,9 +26,9 @@ const STREAK_LENGTH = 7
 const STREAK_SPAN = 60
 const STREAK_SPEED = 55
 
-function travelIntensity(progress: number) {
-  const fadeIn = THREE.MathUtils.smoothstep(progress, TRAVEL_START, TRAVEL_PEAK_END)
-  const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, TRAVEL_PEAK_END, TRAVEL_END)
+function travelIntensity(progress: number, start: number, peakEnd: number, end: number) {
+  const fadeIn = THREE.MathUtils.smoothstep(progress, start, peakEnd)
+  const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, peakEnd, end)
   return Math.min(fadeIn, fadeOut)
 }
 
@@ -45,14 +51,24 @@ function createStreaks(): Streak[] {
 const pathPoint = new THREE.Vector3()
 const dummy = new THREE.Object3D()
 
-export function SpaceTravelEffect() {
+export function SpaceTravelEffect({
+  start = DEFAULT_START,
+  peakEnd = DEFAULT_PEAK_END,
+  end = DEFAULT_END,
+  color = '#bfe6ff',
+}: {
+  start?: number
+  peakEnd?: number
+  end?: number
+  color?: string
+}) {
   const meshRef = useRef<THREE.InstancedMesh>(null!)
   const groupRef = useRef<THREE.Group>(null!)
   const streaks = useMemo(() => createStreaks(), [])
 
   useFrame((_, delta) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
-    const intensity = travelIntensity(progress)
+    const intensity = travelIntensity(progress, start, peakEnd, end)
     const visible = intensity > 0.01
     groupRef.current.visible = visible
     if (!visible) return
@@ -81,7 +97,7 @@ export function SpaceTravelEffect() {
     <group ref={groupRef}>
       <instancedMesh ref={meshRef} args={[undefined, undefined, STREAK_COUNT]}>
         <cylinderGeometry args={[0.035, 0.035, STREAK_LENGTH, 5]} />
-        <meshBasicMaterial color="#bfe6ff" transparent opacity={0} toneMapped={false} depthWrite={false} />
+        <meshBasicMaterial color={color} transparent opacity={0} toneMapped={false} depthWrite={false} />
       </instancedMesh>
     </group>
   )

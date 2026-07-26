@@ -24,8 +24,13 @@ const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной �
 export const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
 export const PLANET_RADIUS = 45
 const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
-export const FADE_OUT_START = 0.9
-export const FADE_OUT_END = 0.97
+// БЫЛО 0.9-0.97 - выше реально достижимого максимума progress (~0.852,
+// пока страница видна, см. разбор в FogController.tsx) - Земля физически
+// не могла начать гаснуть ни при каком скролле. Синхронизировано с
+// GroundZone.tsx (FADE_IN_START/END там равны этим же числам) - Земля
+// гаснет ровно в темпе, в котором проявляется город поверх неё.
+export const FADE_OUT_START = 0.75
+export const FADE_OUT_END = 0.85
 
 // Раньше Земля появлялась по прогрессу скролла (0-0.05 — практически
 // мгновенно), пока камера была ещё в 80-100 юнитах от неё. На таком
@@ -43,13 +48,49 @@ export const FADE_OUT_END = 0.97
 //     а не на прогресс скролла — так "проявление" физически совпадает
 //     с моментом настоящего приближения, а не происходит на глазок.
 //
-// Пороги подобраны по реальной выборке cameraPath.getPointAt (шаг
-// 0.025 по всей длине пути, посчитано отдельным скриптом): дистанция
-// опускается ниже 72 около progress~0.705 и ниже 54 около progress~0.865
-// — то есть раскрытие идёт примерно на 0.705-0.865, до начала
-// FADE_OUT_START (0.9), без наложения одного на другое.
-export const REVEAL_FAR_DISTANCE = 72
-export const REVEAL_NEAR_DISTANCE = 54
+// ВТОРАЯ итерация. Клиент (используя JourneyTuner.tsx, где 0-100% -
+// это доля именно ВИДИМОГО путешествия, не progress) сообщил: "к планете
+// приближаться сквозь космос, а не то, что она сразу большая появляется".
+// Численно (скрипт, тот же расчёт, что и в JourneyTuner) старые пороги
+// (72/54) укладывали ВСЁ раскрытие (0% непрозрачности -> ~98%) в
+// progress~0.705-0.865, а это всего ~83-100% от видимого путешествия -
+// на глаз ровно "внезапно появилась" в последний момент. Дистанция от
+// камеры до планеты на самом деле снижается монотонно и плавно
+// ВСЮ дорогу (101.98 на 0% пути -> 55.59 на 100%) - её просто не
+// использовали настолько рано, насколько можно было. Новые пороги
+// растягивают появление на весь диапазон "полёта через космос":
+// FAR=95 (дистанция на ~45-48% пути - Земля начинает проступать ещё
+// очень далёкой точкой) -> NEAR=60 (дистанция на ~95% пути - почти
+// полная непрозрачность прямо перед входом в облака/город). На 80%
+// пути (дистанция ~76) это даёт ~56% непрозрачности - планета уже
+// хорошо видна издалека, но продолжает "наливаться" по мере подлёта,
+// а не хлопает сразу в полный размер.
+export const REVEAL_FAR_DISTANCE = 95
+export const REVEAL_NEAR_DISTANCE = 60
+
+// ТРЕТЬЯ итерация — потребовалась сразу после проверки скриншотом на
+// 80%: с одной только непрозрачностью планета на 80% пути оказалась
+// ОГРОМНОЙ, на весь экран, а не "видна издалека", как просил клиент.
+// Причина в геометрии, не в порогах: PLANET_RADIUS=45, а реальная
+// дистанция камера->центр планеты во ВСЁМ путешествии лежит в диапазоне
+// 55-102 (см. таблицу в EarthPlanet.tsx истории) — то есть камера НИКОГДА
+// не оказывается достаточно далеко, чтобы сфера радиусом 45 выглядела
+// маленькой чисто через перспективу (на дистанции 76 ближняя точка
+// поверхности всего в 31 юните от камеры). Это нельзя починить только
+// порогами прозрачности - масштаб "маленькая далёкая планета" физически
+// недостижим при таком радиусе и такой дистанции.
+// Решение — отдельная, более узкая (и куда более позднaя) кривая
+// МАСШТАБА поверх уже имеющейся кривой непрозрачности: сама модель
+// растёт от MIN_VISUAL_SCALE (маленькая точка) до полного размера
+// только на последнем отрезке подлёта (дистанция 76->58, это ~80%-96%
+// пути) — раньше, пока непрозрачность уже растёт (45%-80% пути),
+// планета видна, но нарочно остаётся маленькой. Не физически точная
+// перспектива, а художественный приём (тот же, которым в большинстве
+// космических фильмов "подделывают" ощущение приближения к планете
+// нереалистичного в игровых масштабах размера).
+const SCALE_FAR_DISTANCE = 76
+const SCALE_NEAR_DISTANCE = 58
+const MIN_VISUAL_SCALE = 0.12
 
 export function EarthPlanet() {
   const { scene } = useGLTF(earthModelUrl)
@@ -66,7 +107,6 @@ export function EarthPlanet() {
 
   useFrame((state, delta) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
-    modelRef.current.rotation.y += delta * 0.02
 
     const distance = state.camera.position.distanceTo(PLANET_CENTER)
     const fadeIn = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
@@ -74,7 +114,12 @@ export function EarthPlanet() {
     const opacity = fadeIn * fadeOut
     const visible = opacity > 0.01
 
+    const sizeFade = 1 - THREE.MathUtils.smoothstep(distance, SCALE_NEAR_DISTANCE, SCALE_FAR_DISTANCE)
+    const visualScale = THREE.MathUtils.lerp(MIN_VISUAL_SCALE, 1, sizeFade) * MODEL_SCALE
+
+    modelRef.current.rotation.y += delta * 0.02
     modelRef.current.visible = visible
+    modelRef.current.scale.setScalar(visualScale)
     modelRef.current.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const material = child.material as THREE.MeshStandardMaterial
@@ -84,16 +129,17 @@ export function EarthPlanet() {
     })
 
     const atmosphereMaterial = atmoRef.current.material as THREE.MeshBasicMaterial
+    atmoRef.current.scale.setScalar(1.04 * THREE.MathUtils.lerp(MIN_VISUAL_SCALE, 1, sizeFade))
     atmosphereMaterial.opacity = opacity * 0.4
     atmosphereMaterial.visible = visible
   })
 
   return (
     <group position={PLANET_CENTER}>
-      <group ref={modelRef} scale={MODEL_SCALE}>
+      <group ref={modelRef}>
         <primitive object={scene} />
       </group>
-      <mesh ref={atmoRef} scale={1.04}>
+      <mesh ref={atmoRef}>
         <sphereGeometry args={[PLANET_RADIUS, 48, 48]} />
         <meshBasicMaterial
           color="#6fb7ff"

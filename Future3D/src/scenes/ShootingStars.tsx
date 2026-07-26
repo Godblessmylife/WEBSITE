@@ -7,10 +7,17 @@ import { usePerfStore } from '@/utils/perfStore'
 const METEOR_COUNT = 10
 const METEOR_COUNT_MOBILE = 5
 
+// Локальные координаты внутри SkyZone (та рендерит это на
+// position=[0, ZONE_ORIGIN_Y=50, 0]) — БЫЛО randFloat(35,75), то есть
+// мировая высота 85-125: камера в течение всего времени, что SkyZone
+// активна (progress ~0-0.3), находится на мировой высоте 55-60 (см.
+// cameraPath.ts) - метеоры спавнились на 25-65 юнитов ВЫШЕ камеры,
+// то есть практически никогда не попадали в кадр. Диапазон 0-15
+// (мировая высота 50-65) реально накрывает высоту камеры.
 function randomSpawn() {
   return new THREE.Vector3(
     THREE.MathUtils.randFloatSpread(90),
-    THREE.MathUtils.randFloat(35, 75),
+    THREE.MathUtils.randFloat(0, 15),
     THREE.MathUtils.randFloatSpread(90),
   )
 }

@@ -9,6 +9,7 @@ import { CloudZone } from './CloudZone'
 import { GroundZone } from './GroundZone'
 import { Ufos } from './Ufos'
 import { SpaceTravelEffect } from './SpaceTravelEffect'
+import { ApproachMeteors } from './ApproachMeteors'
 import { FloatingClock } from './FloatingClock'
 import { Effects } from '@/effects/Effects'
 import { usePerfStore } from '@/utils/perfStore'
@@ -43,6 +44,14 @@ export function JourneyScene() {
       <GroundZone />
       <Ufos />
       <SpaceTravelEffect />
+      {/* Второй экземпляр — "эффект ускорения" на подлёте к Земле
+          (~55-88% видимого путешествия, см. JourneyTuner.tsx), парой с
+          ApproachMeteors ("падающие звёзды" на этом же участке) - по
+          просьбе клиента "приближаться к планете сквозь космос". Окно
+          подобрано так, чтобы погаснуть до перехода в облака
+          (FogController: SKY_HOLD_END). */}
+      <SpaceTravelEffect start={0.376} peakEnd={0.545} end={0.74} />
+      <ApproachMeteors />
       <FloatingClock />
       <Effects />
     </Canvas>
