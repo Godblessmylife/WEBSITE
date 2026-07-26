@@ -1,9 +1,51 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import computerModelUrl from '../models/computer.glb'
+
+// Клик по START раньше запускал ОДНОВРЕМЕННО: скачивание ~2.2 МБ (gzip)
+// JS-чанка игры (App.tsx: React.lazy) И первую загрузку/декодирование
+// ДЕСЯТКА с лишним .glb-моделей (герой, оба портала, вся карта из
+// MapProps.tsx, Земля для космоса) - на не самом быстром интернете или
+// слабом устройстве это одномоментное "стадо" запросов иногда не
+// укладывалось в разумное время, ErrorBoundary (GameErrorBoundary.tsx)
+// ловил итоговую ошибку/таймаут, и игра "выкидывало обратно" - вторая
+// попытка уже проходила на прогретом кеше браузера. Предзагрузка чанка
+// (а вместе с ним - и всех model.glb, у них у всех есть useGLTF.preload
+// на верхнем уровне модуля, который выполнится как побочный эффект
+// импорта) заранее, в простое браузера, размазывает эту нагрузку по
+// времени просмотра сайта вместо разового всплеска в момент клика.
+function usePrefetchGame() {
+  useEffect(() => {
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const prefetch = () => {
+      import('@/game/GameMode')
+    }
+
+    const ric = (window as typeof window & { requestIdleCallback?: (cb: () => void) => number })
+      .requestIdleCallback
+    if (typeof ric === 'function') {
+      idleId = ric(prefetch)
+    } else {
+      // Safari не знает requestIdleCallback - небольшая задержка вместо
+      // него, чтобы не конкурировать с загрузкой самой первой секции сайта.
+      timeoutId = setTimeout(prefetch, 2500)
+    }
+
+    return () => {
+      if (idleId !== undefined) {
+        ;(window as typeof window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(
+          idleId,
+        )
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }, [])
+}
 
 // "START" нарисован на canvas (тот же приём, что и тематические
 // заставки карточек портфолио — без завязки на библиотеку 3D-текста).
@@ -91,6 +133,7 @@ function Computer() {
 // зум колёсиком/щипком без написания своей логики.
 export function GameEntry() {
   const setGameActive = useGameStore((s) => s.setGameActive)
+  usePrefetchGame()
 
   return (
     <section

@@ -46,11 +46,37 @@ const BONUS_POSITIONS: [number, number, number][] = [
 
 const bonusWorldPos = new THREE.Vector3()
 
-function BonusOrb({ position, withLight }: { position: [number, number, number]; withLight: boolean }) {
+// ВАЖНО: собранный орб раньше полностью размонтировался (родитель
+// возвращал null вместо <BonusOrb>), включая его pointLight. Three.js
+// пересчитывает numPointLights (кол-во активных источников света) заново
+// на КАЖДЫЙ рендер-кадр по факту обхода сцены (WebGLRenderer.js,
+// projectObject: "if (object.visible === false) return" - обрыв обхода
+// на невидимом объекте, значит скрытый через visible свет ТОЖЕ выпал бы
+// из подсчёта) - а numPointLights входит в ключ кэша WebGL-шейдеров
+// (WebGLPrograms.js). Любое изменение этого числа заставляет
+// перекомпилировать программу ЗАНОВО для каждого материала в сцене,
+// который рендерится после этого кадра - синхронная компиляция GLSL,
+// вот и просадка на ~2 секунды именно в момент подбора (и только для
+// первых 8 орбов с реальным светом - у остальных 16 light вообще нет).
+// Исправлено: свет остаётся смонтированным и visible=true ВСЕГДА (число
+// огней в сцене не меняется никогда), гаснет только через intensity=0.
+// Видимость самого меша (диск+кольцо) можно спокойно переключать через
+// visible - это не влияет на ключ кэша шейдеров, только пропускает
+// draw call.
+function BonusOrb({
+  position,
+  withLight,
+  collected,
+}: {
+  position: [number, number, number]
+  withLight: boolean
+  collected: boolean
+}) {
   const groupRef = useRef<THREE.Group>(null!)
   const ringRef = useRef<THREE.Mesh>(null!)
 
   useFrame(({ clock }, delta) => {
+    if (collected) return
     const t = clock.elapsedTime
     groupRef.current.position.y = position[1] + Math.sin(t * 2 + position[0]) * 0.15
     groupRef.current.rotation.y += delta * 1.2
@@ -59,7 +85,7 @@ function BonusOrb({ position, withLight }: { position: [number, number, number];
 
   return (
     <group ref={groupRef} position={position}>
-      <mesh>
+      <mesh visible={!collected}>
         <icosahedronGeometry args={[0.32, 0]} />
         <meshStandardMaterial
           color="#ffd76a"
@@ -69,11 +95,11 @@ function BonusOrb({ position, withLight }: { position: [number, number, number];
           metalness={0.4}
         />
       </mesh>
-      <mesh ref={ringRef}>
+      <mesh ref={ringRef} visible={!collected}>
         <torusGeometry args={[0.5, 0.04, 8, 24]} />
         <meshBasicMaterial color="#ffe9b0" toneMapped={false} />
       </mesh>
-      {withLight && <pointLight color="#ffcf7a" intensity={2} distance={4} />}
+      {withLight && <pointLight color="#ffcf7a" intensity={collected ? 0 : 2} distance={4} />}
     </group>
   )
 }
@@ -115,11 +141,14 @@ export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | nul
 
   return (
     <>
-      {BONUS_POSITIONS.map((pos, i) =>
-        collected[i] ? null : (
-          <BonusOrb key={i} position={pos} withLight={!reduced && i < LIT_BONUS_COUNT} />
-        ),
-      )}
+      {BONUS_POSITIONS.map((pos, i) => (
+        <BonusOrb
+          key={i}
+          position={pos}
+          withLight={!reduced && i < LIT_BONUS_COUNT}
+          collected={collected[i]}
+        />
+      ))}
     </>
   )
 }
