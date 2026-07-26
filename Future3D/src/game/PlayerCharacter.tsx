@@ -67,6 +67,7 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       position={[0, 2, 0]}
       capsuleHalfHeight={CAPSULE_HALF_HEIGHT}
       capsuleRadius={CAPSULE_RADIUS}
+      maxRunVel={7}
     >
       <group ref={tiltRef}>
         <primitive object={scene} position={[0, MODEL_Y_OFFSET, 0]} />

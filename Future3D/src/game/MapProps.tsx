@@ -4,6 +4,11 @@ import minishopUrl from '../models/minishop.glb'
 import shopUrl from '../models/shop.glb'
 import rocketUrl from '../models/rocket.glb'
 import computerBigUrl from '../models/computerbig.glb'
+import chillZoneUrl from '../models/chill_zone.glb'
+import npc2Url from '../models/npc2.glb'
+import slotUrl from '../models/slot.glb'
+import slot2Url from '../models/slot2.glb'
+import ostrovokUrl from '../models/ostrovok.glb'
 
 // Коллайдеры — ЯВНЫЕ CuboidCollider с размерами/центром, посчитанными из
 // реального bbox моделей (gltf-transform inspect), а НЕ colliders="cuboid"
@@ -71,10 +76,85 @@ function ComputerBig() {
   )
 }
 
+function ChillZone() {
+  const { scene } = useGLTF(chillZoneUrl)
+  // bbox: (-9.47,-0.199,-8.04) .. (8.135,3.432,9.867), scale=1
+  return (
+    <RigidBody type="fixed" colliders={false} position={[-60, 0.199, 40]}>
+      <CuboidCollider args={[8.8, 1.82, 8.95]} position={[-0.67, 1.62, 0.91]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
+function Npc2Decor() {
+  const { scene } = useGLTF(npc2Url)
+  // ВАЖНО: bbox посчитан по ИСХОДНОМУ (до gltf-transform optimize) файлу.
+  // npc1/npc2/slot2 — скиненные модели (есть rootJoint), и inspect после
+  // optimize у всех трёх выдаёт подозрительно одинаковый "круглый" bbox
+  // (-1..1 по X/Z) — это глюк расчёта bbox для скиненной геометрии в
+  // используемой версии gltf-transform, не реальные размеры (визуально
+  // меш не меняется, vertex count до/после почти идентичен). Опираться
+  // на bbox нужно ДО оптимизации.
+  // Исходный bbox: (-10.12,-1.198,-6.114) .. (10.12,1.508,9.201) — судя
+  // по пропорциям (широкая и плоская, ~20x2.7x15), это не отдельный
+  // персонаж как npc1, а декоративная сцена/группа — используется как
+  // декорация, а не как второй диалоговый NPC. Если задумывалось иначе —
+  // легко поменять.
+  return (
+    <RigidBody type="fixed" colliders={false} position={[-70, 1.198, -40]}>
+      <CuboidCollider args={[10.12, 1.35, 7.66]} position={[0, 0.16, 1.54]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
+function SlotMachine() {
+  const { scene } = useGLTF(slotUrl)
+  // bbox: (-5.865,0,-4.681) .. (5.865,23.973,4.681), scale=1 — уже стоит
+  // на y=0, подъём не нужен. Высота (~24 юнита) необычна для игрового
+  // автомата, но доверяем авторскому масштабу модели без визуальной
+  // проверки в браузере.
+  return (
+    <RigidBody type="fixed" colliders={false} position={[60, 0, -50]}>
+      <CuboidCollider args={[5.865, 11.99, 4.68]} position={[0, 11.99, 0]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
+function SlotMachine2() {
+  const { scene } = useGLTF(slot2Url)
+  // Скиненная модель — bbox по исходнику (см. комментарий в Npc2Decor):
+  // (-0.341,-0.335,-1.851) .. (0.359,0.434,-0.002).
+  return (
+    <RigidBody type="fixed" colliders={false} position={[60, 0.335, -30]}>
+      <CuboidCollider args={[0.35, 0.38, 0.92]} position={[0.01, 0.05, -0.93]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
+function Mountain() {
+  const { scene } = useGLTF(ostrovokUrl)
+  // "Островок" — огромный (~92x10.3x92) массив с перепадом высоты,
+  // единственная из новых моделей подходящая под запрошенную "гору".
+  // Коллайдер — один бокс на весь массив (не повторяет реальный рельеф
+  // с холмами/впадинами) — гора здесь непроходимый ландшафтный объект,
+  // который обходят, а не взбираются на него, как и остальные постройки
+  // на карте.
+  return (
+    <RigidBody type="fixed" colliders={false} position={[85, 2.854, 70]}>
+      <CuboidCollider args={[45.97, 5.13, 45.97]} position={[-1.98, 2.27, -11.18]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
 // Дополнительные постройки на карте — по просьбе клиента. Раскиданы
 // подальше от стартового кластера (спавн, бонусы в радиусе ~10, портал
-// на (10,0,-10)), но всё ещё в пределах площадки 140x140 (половина
-// стороны 70) — с большим запасом до края.
+// на (10,0,-10)), но всё ещё в пределах увеличенной площадки 280x280
+// (половина стороны 140) — с запасом до края.
 export function MapProps() {
   return (
     <>
@@ -82,6 +162,11 @@ export function MapProps() {
       <Shop />
       <Rocket />
       <ComputerBig />
+      <ChillZone />
+      <Npc2Decor />
+      <SlotMachine />
+      <SlotMachine2 />
+      <Mountain />
     </>
   )
 }
@@ -90,3 +175,8 @@ useGLTF.preload(minishopUrl)
 useGLTF.preload(shopUrl)
 useGLTF.preload(rocketUrl)
 useGLTF.preload(computerBigUrl)
+useGLTF.preload(chillZoneUrl)
+useGLTF.preload(npc2Url)
+useGLTF.preload(slotUrl)
+useGLTF.preload(slot2Url)
+useGLTF.preload(ostrovokUrl)

@@ -12,6 +12,10 @@ import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
 import { Portal } from './Portal'
 import { Bonuses } from './Bonuses'
+import { QuestNpc } from './QuestNpc'
+import { QuestItem } from './QuestItem'
+import { QuestDialogue, QuestLog } from './QuestUI'
+import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { GameLoadingScreen } from './GameLoadingScreen'
 
@@ -32,6 +36,8 @@ export function GameMode() {
   const score = useGameStore((s) => s.score)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
   const reduced = usePerfStore((s) => s.reduced)
+  const setLogOpen = useQuestStore((s) => s.setLogOpen)
+  const isLogOpen = useQuestStore((s) => s.isLogOpen)
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
@@ -47,7 +53,10 @@ export function GameMode() {
       >
         <AdaptivePerformance />
         <color attach="background" args={['#0a1120']} />
-        <fog attach="fog" args={['#0a1120', 20, 70]} />
+        {/* far поднят с 70 до 170 вместе с увеличением площадки
+            (GameWorld: 140->280) — гора (MapProps: Mountain, ~90-130
+            юнитов от центра) должна быть видна, а не тонуть в тумане. */}
+        <fog attach="fog" args={['#0a1120', 20, 170]} />
         <Suspense
           fallback={
             <Html center>
@@ -61,6 +70,8 @@ export function GameMode() {
             </KeyboardControls>
             <GameWorld />
             <Bonuses ecctrlRef={ecctrlRef} />
+            <QuestNpc />
+            <QuestItem ecctrlRef={ecctrlRef} />
             <Portal ecctrlRef={ecctrlRef} onEnter={() => setGameActive(false)} />
           </Physics>
         </Suspense>
@@ -89,6 +100,27 @@ export function GameMode() {
         <span aria-hidden="true">✦</span>
         {score}
       </div>
+
+      <button
+        onClick={() => setLogOpen(!isLogOpen)}
+        style={{
+          position: 'absolute',
+          top: 'calc(1.5rem + env(safe-area-inset-top))',
+          left: 'calc(1.5rem + 9rem + env(safe-area-inset-left))',
+          padding: '0.6rem 1.4rem',
+          minHeight: '2.75rem',
+          background: 'rgba(10, 17, 32, 0.6)',
+          border: '1px solid rgba(255, 215, 106, 0.6)',
+          borderRadius: '999px',
+          color: '#ffe9b0',
+          fontFamily: "'Orbitron', sans-serif",
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          zIndex: 1001,
+        }}
+      >
+        Квесты
+      </button>
 
       <button
         onClick={() => setGameActive(false)}
@@ -125,6 +157,9 @@ export function GameMode() {
           до конца. Убрать (или спрятать за флагом), когда перестанет
           быть нужен. */}
       <GameDebugHUD />
+
+      <QuestLog />
+      <QuestDialogue />
     </div>
   )
 }
