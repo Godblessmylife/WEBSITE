@@ -8,12 +8,14 @@ import { JourneyScene } from '@/scenes/JourneyScene'
 import { Nav } from '@/components/Nav'
 import { AboutSection } from '@/components/AboutSection'
 import { PortfolioCarousel } from '@/components/PortfolioCarousel'
+import { PortfolioGallery } from '@/components/PortfolioGallery'
 import { PricingSection } from '@/components/PricingSection'
 import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
 import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { useGameStore } from '@/utils/gameStore'
+import { useGalleryStore } from '@/utils/galleryStore'
 import './styles/globals.css'
 
 // GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
@@ -33,6 +35,7 @@ export function App() {
   useLenis()
   const isGameActive = useGameStore((s) => s.isGameActive)
   const setGameActive = useGameStore((s) => s.setGameActive)
+  const isGalleryOpen = useGalleryStore((s) => s.isOpen)
 
   return (
     <>
@@ -64,6 +67,8 @@ export function App() {
           </Suspense>
         </GameErrorBoundary>
       )}
+
+      {isGalleryOpen && <PortfolioGallery />}
     </>
   )
 }

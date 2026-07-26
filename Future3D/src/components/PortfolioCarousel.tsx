@@ -1,80 +1,15 @@
 import { useMemo, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
 import { Environment, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
+import { THEMES, createThemeTexture } from '@/utils/themeTexture'
+import { useGalleryStore } from '@/utils/galleryStore'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
-
-// Нет инструмента генерации изображений — вместо реальных фото проектов
-// (которых пока и нет) каждая карточка получает свою процедурную
-// тематическую заставку (canvas: градиент + абстрактные кольца + подпись
-// категории). Как только появятся настоящие превью проектов, эта
-// текстура меняется на map={realProjectTexture} в одну строку.
-interface Theme {
-  title: string
-  base: string
-  accent: string
-  glow: string
-}
-
-const THEMES: Theme[] = [
-  { title: 'ВЕБ-САЙТЫ', base: '#0a1a2e', accent: '#3fa9f5', glow: '#7dd3ff' },
-  { title: 'ИГРЫ', base: '#1c0a2e', accent: '#b34ff5', glow: '#ff8ae2' },
-  { title: '3D / VR', base: '#0a2e22', accent: '#3ff5a0', glow: '#8affc9' },
-  { title: 'БРЕНДИНГ', base: '#2e1a0a', accent: '#f5a83f', glow: '#ffce8a' },
-  { title: 'ПРИЛОЖЕНИЯ', base: '#2e0a14', accent: '#f53f6e', glow: '#ff8aa8' },
-]
-
-function createThemeTexture(theme: Theme) {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 720
-  const ctx = canvas.getContext('2d')!
-
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height)
-  grad.addColorStop(0, theme.base)
-  grad.addColorStop(1, '#05070d')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  ctx.strokeStyle = theme.accent
-  ctx.lineWidth = 2
-  ctx.globalAlpha = 0.45
-  for (let i = 0; i < 6; i++) {
-    ctx.beginPath()
-    ctx.arc(canvas.width / 2, canvas.height * 0.4, 40 + i * 42, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-  ctx.globalAlpha = 1
-
-  const glow = ctx.createRadialGradient(
-    canvas.width / 2, canvas.height * 0.4, 0,
-    canvas.width / 2, canvas.height * 0.4, 100,
-  )
-  glow.addColorStop(0, theme.glow)
-  glow.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = glow
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  ctx.fillStyle = '#f4f7fb'
-  ctx.font = 'bold 42px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(theme.title, canvas.width / 2, canvas.height * 0.82)
-
-  ctx.strokeStyle = theme.accent
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(canvas.width * 0.26, canvas.height * 0.86)
-  ctx.lineTo(canvas.width * 0.74, canvas.height * 0.86)
-  ctx.stroke()
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
 
 interface DragState {
   active: boolean
@@ -82,10 +17,20 @@ interface DragState {
   velocity: number
 }
 
+// Двойной клик по карточке — открыть 3D-галерею проектов (см.
+// PortfolioGallery.tsx). stopPropagation не нужен: onDoubleClick — это
+// отдельное синтетическое событие R3F, drag-вращение карусели слушает
+// onPointerDown/Move/Up на самом Canvas и живёт своей жизнью независимо.
 function Card({ index }: { index: number }) {
   const angle = (index / CARD_COUNT) * Math.PI * 2
   const theme = THEMES[index % THEMES.length]
   const texture = useMemo(() => createThemeTexture(theme), [theme])
+  const openGallery = useGalleryStore((s) => s.setOpen)
+
+  const onDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    openGallery(true)
+  }
 
   return (
     <group
@@ -94,11 +39,11 @@ function Card({ index }: { index: number }) {
     >
       {/* зеркальная рамка: высокий metalness + низкий roughness +
           окружение (Environment) дают настоящее отражение сцены вокруг */}
-      <mesh>
+      <mesh onDoubleClick={onDoubleClick}>
         <boxGeometry args={[1.7, 2.3, 0.06]} />
         <meshStandardMaterial color="#eef2f6" metalness={1} roughness={0.06} envMapIntensity={1.5} />
       </mesh>
-      <mesh position={[0, 0, 0.035]}>
+      <mesh position={[0, 0, 0.035]} onDoubleClick={onDoubleClick}>
         <planeGeometry args={[1.5, 2.1]} />
         <meshStandardMaterial map={texture} metalness={0.1} roughness={0.4} />
       </mesh>
