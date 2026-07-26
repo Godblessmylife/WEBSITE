@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -37,7 +37,7 @@ const MARKER_COLOR: Record<MarkerType, string> = {
 // проще и не рискует разъехаться, т.к. эти позиции не планируется менять
 // динамически).
 const STATIC_MARKERS: { type: MarkerType; x: number; z: number; label: string }[] = [
-  { type: 'portal', x: 10, z: -10, label: 'Портал (выход)' },
+  { type: 'portal', x: 10, z: -10, label: 'Портал (в космос)' },
   { type: 'shop', x: -28, z: 18, label: 'Магазин' },
   { type: 'shop', x: 30, z: -25, label: 'Лавка' },
   { type: 'shop', x: -22, z: -28, label: 'Ракета' },
@@ -51,6 +51,78 @@ const STATIC_MARKERS: { type: MarkerType; x: number; z: number; label: string }[
 
 const NPC_MARKER = { x: 2, z: 4 }
 const QUEST_ITEM_MARKER = { x: 25, z: -15 }
+const MOUNTAIN_MARKER = { x: 85, z: 70 }
+
+// Раньше фон карты был плоской заливкой (rgba тёмно-синего) - по отзыву
+// клиента это читалось как "просто синий фон", а не карта местности.
+// Тот же приём, что и у DesertGround.createSandTexture (GameWorld.tsx) -
+// canvas 2D, песочный градиент + несколько "дюн"-линий - но отдельная,
+// уменьшенная копия: тащить сюда 3D-текстуру ради 2D DOM-фона было бы
+// лишней связью между никак иначе не связанными модулями. Плюс тёмное
+// пятно там, где на карте гора (MOUNTAIN_MARKER) - другой тип рельефа,
+// а не тот же песок.
+function createMinimapTerrain(): string {
+  const canvas = document.createElement('canvas')
+  canvas.width = MAP_SIZE
+  canvas.height = MAP_SIZE
+  const ctx = canvas.getContext('2d')!
+
+  const base = ctx.createLinearGradient(0, 0, MAP_SIZE, MAP_SIZE)
+  base.addColorStop(0, '#8a6a3f')
+  base.addColorStop(1, '#5f4527')
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE)
+
+  ctx.globalAlpha = 0.3
+  ctx.strokeStyle = '#3d2c18'
+  for (let i = 0; i < 9; i++) {
+    ctx.lineWidth = 1 + Math.random() * 2
+    const y = Math.random() * MAP_SIZE
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.bezierCurveTo(
+      MAP_SIZE * 0.3,
+      y + (Math.random() * 16 - 8),
+      MAP_SIZE * 0.6,
+      y + (Math.random() * 16 - 8),
+      MAP_SIZE,
+      y,
+    )
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+
+  const mountainPos = worldToMap(MOUNTAIN_MARKER.x, MOUNTAIN_MARKER.z)
+  const rockGradient = ctx.createRadialGradient(
+    mountainPos.left,
+    mountainPos.top,
+    2,
+    mountainPos.left,
+    mountainPos.top,
+    26,
+  )
+  rockGradient.addColorStop(0, 'rgba(120, 120, 128, 0.9)')
+  rockGradient.addColorStop(1, 'rgba(120, 120, 128, 0)')
+  ctx.fillStyle = rockGradient
+  ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE)
+
+  // Лёгкая виньетка по краям - чтобы точки-маркеры не сливались с
+  // текстурой у самой рамки карты.
+  const vignette = ctx.createRadialGradient(
+    MAP_SIZE / 2,
+    MAP_SIZE / 2,
+    MAP_SIZE * 0.35,
+    MAP_SIZE / 2,
+    MAP_SIZE / 2,
+    MAP_SIZE * 0.7,
+  )
+  vignette.addColorStop(0, 'rgba(5, 7, 13, 0)')
+  vignette.addColorStop(1, 'rgba(5, 7, 13, 0.55)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE)
+
+  return canvas.toDataURL()
+}
 
 // Отдельный компонент ВНУТРИ <Canvas> (как GameDebugTracker) - только
 // пишет позицию/поворот игрока в vanilla-стор каждый кадр, сам ничего не
@@ -78,6 +150,7 @@ export function MinimapTracker({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandl
 export function Minimap() {
   const arrowRef = useRef<HTMLDivElement>(null!)
   const questStatus = useQuestStore((s) => s.status)
+  const terrainUrl = useMemo(() => createMinimapTerrain(), [])
 
   useEffect(() => {
     const unsub = minimapPlayerStore.subscribe((state) => {
@@ -100,7 +173,8 @@ export function Minimap() {
         right: 'calc(1.5rem + env(safe-area-inset-right))',
         width: `${MAP_SIZE}px`,
         height: `${MAP_SIZE}px`,
-        background: 'rgba(10, 17, 32, 0.7)',
+        backgroundImage: `url(${terrainUrl})`,
+        backgroundSize: 'cover',
         border: '1px solid rgba(255, 215, 106, 0.5)',
         borderRadius: '12px',
         overflow: 'hidden',
@@ -124,7 +198,7 @@ export function Minimap() {
               marginTop: '-3.5px',
               borderRadius: m.type === 'mountain' ? '2px' : '50%',
               background: MARKER_COLOR[m.type],
-              opacity: 0.85,
+              border: '1px solid rgba(5, 7, 13, 0.6)',
             }}
           />
         )
@@ -145,6 +219,7 @@ export function Minimap() {
           marginTop: '-5px',
           borderRadius: '50%',
           background: MARKER_COLOR.npc,
+          border: '1.5px solid rgba(5, 7, 13, 0.7)',
           boxShadow: npcActionable ? `0 0 0 4px rgba(255, 215, 106, 0.35)` : 'none',
           animation: npcActionable ? 'minimap-npc-pulse 1.6s ease-in-out infinite' : 'none',
         }}

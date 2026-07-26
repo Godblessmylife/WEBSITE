@@ -63,15 +63,24 @@ function Rocket() {
   )
 }
 
+const COMPUTER_BIG_POSITION: [number, number, number] = [20, 0, 20]
+// bbox исходника: (-0.538,0,-0.202) .. (0.537,0.552,0.269) - при scale=1
+// это стол высотой 55см (уровень журнального столика), а не рабочий стол
+// с монитором - по отзыву клиента модель на карте выглядела игрушечно
+// маленькой. 2.2x поднимает высоту до ~1.2м (нормальный стол+монитор
+// рядом с персонажем ростом ~1.74м), при этом ширина ~2.37м - для
+// "большого" игрового стола (computerBIG) с этим и не должна быть узкой.
+const COMPUTER_BIG_SCALE = 2.2
+
 function ComputerBig() {
   const { scene } = useGLTF(computerBigUrl)
-  // Уже прогнан через gltf-transform в прошлой сессии (модель ранее не
-  // использовалась нигде на сайте) — bbox в разумных "настольных"
-  // пропорциях, ~1x0.55x0.47, дополнительный scale не нужен.
   return (
-    <RigidBody type="fixed" colliders={false} position={[20, 0, 20]}>
-      <CuboidCollider args={[0.54, 0.28, 0.24]} position={[0, 0.28, 0.03]} />
-      <primitive object={scene} />
+    <RigidBody type="fixed" colliders={false} position={COMPUTER_BIG_POSITION}>
+      <CuboidCollider
+        args={[0.54 * COMPUTER_BIG_SCALE, 0.28 * COMPUTER_BIG_SCALE, 0.24 * COMPUTER_BIG_SCALE]}
+        position={[0, 0.28 * COMPUTER_BIG_SCALE, 0.03 * COMPUTER_BIG_SCALE]}
+      />
+      <primitive object={scene} scale={COMPUTER_BIG_SCALE} />
     </RigidBody>
   )
 }

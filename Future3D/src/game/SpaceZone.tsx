@@ -22,6 +22,12 @@ import earthModelUrl from '../models/earth.glb'
 // пользуется Portal.tsx напрямую, вне этой группы).
 const SPACE_ORIGIN: [number, number, number] = [0, 220, 0]
 export const SPACE_TELEPORT_TARGET = new THREE.Vector3(0, 222.5, 0)
+// Портал обратно в пустыню (Portal.tsx, второй экземпляр в GameMode.tsx) -
+// смещён от точки прибытия (SPACE_TELEPORT_TARGET, центр платформы), чтобы
+// приземление с первого портала не оказалось сразу внутри радиуса
+// срабатывания второго. Тот же y=220, что и верх платформы (см.
+// PLATFORM_HALF_HEIGHT ниже) - портал стоит прямо на её поверхности.
+export const SPACE_RETURN_PORTAL_POSITION = new THREE.Vector3(4, 220, 4)
 const PLATFORM_RADIUS = 8
 const PLATFORM_HALF_HEIGHT = 0.5
 
