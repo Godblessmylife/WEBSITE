@@ -49,6 +49,41 @@ function createWindowsTexture() {
   return texture
 }
 
+// БЫЛО meshStandardMaterial без текстуры (сплошной #10161f) — пока
+// камера не подлетала к городу вплотную, разницы было не видно. После
+// починки финального "нырка" в Землю (см. remapPathProgress в
+// cameraPath.ts) камера на подлёте реально оказывается в considerable
+// units над этой плоскостью — сплошной беспримесный цвет крупным планом
+// выглядел не как земля, а как размытое серое пятно, заглушающее
+// собой всю сцену. Та же техника, что уже используется для окон зданий
+// (canvas-текстура) — лёгкая сетка плит с шумом освещённости, чтобы
+// поверхность читалась как поверхность на любом расстоянии.
+function createGroundTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#10161f'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  const cells = 8
+  const cell = canvas.width / cells
+  for (let r = 0; r < cells; r++) {
+    for (let c = 0; c < cells; c++) {
+      const shade = 0.85 + hash(c, r) * 0.3
+      ctx.fillStyle = `rgba(255,255,255,${(shade - 1) * 0.06 + 0.03})`
+      ctx.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2)
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(52, 52)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 interface BuildingSpec {
   position: [number, number, number]
   width: number
@@ -142,6 +177,7 @@ function Building({
 export function GroundZone() {
   const reduced = usePerfStore((s) => s.reduced)
   const windowsTexture = useMemo(() => createWindowsTexture(), [])
+  const groundTexture = useMemo(() => createGroundTexture(), [])
   const buildings = useMemo(() => generateCity(reduced), [reduced])
   const buildingMaterialsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([])
 
@@ -176,7 +212,7 @@ export function GroundZone() {
     <group position={[0, 0, 0]}>
       <mesh ref={groundRef} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[260, 260]} />
-        <meshStandardMaterial color="#10161f" roughness={0.7} metalness={0.15} />
+        <meshStandardMaterial map={groundTexture} roughness={0.7} metalness={0.15} />
       </mesh>
 
       {buildings.map((spec, i) => (

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type Lenis from 'lenis'
-import { inverseEaseProgress } from './scrollEasing'
+import { easeProgress, inverseEaseProgress } from './scrollEasing'
 
 // Высота скролл-спейсера определяет, сколько реальных пикселей скролла
 // уходит на полный проход камеры от неба до земли. 500 -> 1000 -> 1600:
@@ -34,6 +34,20 @@ interface ScrollState {
 export function journeyScrollRangePx() {
   const spacerPx = (SCROLL_HEIGHT_VH / 100) * window.innerHeight
   return Math.max(0, spacerPx - window.innerHeight)
+}
+
+// Реально достижимый максимум eased-progress, ПОКА 3D-сцена видна — она
+// сама уезжает за экран (см. App.tsx, sticky) раньше, чем прокрутка всей
+// страницы (Lenis raw progress = scroll/limit) успевает дойти до 1.0.
+// Используется CameraRig.tsx, чтобы "хвост" пути камеры (нырок к
+// поверхности Земли) реально проигрывался в достижимом диапазоне, а не
+// обрывался на середине — см. remapPathProgress в cameraPath.ts. Как и
+// journeyScrollRangePx, не кешируется: зависит от высоты вьюпорта и
+// остального контента страницы, может измениться между вызовами.
+export function maxReachableProgress() {
+  const totalRange = document.documentElement.scrollHeight - window.innerHeight
+  if (totalRange <= 0) return 1
+  return easeProgress(Math.min(1, journeyScrollRangePx() / totalRange))
 }
 
 export const useScrollStore = create<ScrollState>((set, get) => ({

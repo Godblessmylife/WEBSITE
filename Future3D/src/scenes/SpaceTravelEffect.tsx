@@ -1,8 +1,8 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useScrollStore } from '@/utils/scrollStore'
-import { cameraPath } from './cameraPath'
+import { useScrollStore, maxReachableProgress } from '@/utils/scrollStore'
+import { cameraPath, remapPathProgress } from './cameraPath'
 
 // "Между солнечной системой и Землёй сделать крутую анимацию, словно
 // путешествие" — окно приурочено к уже существующим константам пути:
@@ -66,6 +66,22 @@ export function SpaceTravelEffect({
   const groupRef = useRef<THREE.Group>(null!)
   const streaks = useMemo(() => createStreaks(), [])
 
+  // Группа следует за реальной позицией камеры на кривой, а не за
+  // прогрессом напрямую — на хвосте пути (см. remapPathProgress в
+  // cameraPath.ts) это разные вещи: CameraRig теперь растягивает
+  // недостижимый иначе финальный "нырок" в Землю в реально достижимый
+  // диапазон progress. Без этой же переразметки здесь эффект уезжал бы
+  // не туда, где реально находится камера.
+  const maxProgressRef = useRef(1)
+  useEffect(() => {
+    const update = () => {
+      maxProgressRef.current = maxReachableProgress()
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
   useFrame((_, delta) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
     const intensity = travelIntensity(progress, start, peakEnd, end)
@@ -73,7 +89,7 @@ export function SpaceTravelEffect({
     groupRef.current.visible = visible
     if (!visible) return
 
-    cameraPath.getPointAt(progress, pathPoint)
+    cameraPath.getPointAt(remapPathProgress(progress, maxProgressRef.current), pathPoint)
     groupRef.current.position.set(pathPoint.x, pathPoint.y, pathPoint.z)
 
     const fallSpeed = STREAK_SPEED * intensity
