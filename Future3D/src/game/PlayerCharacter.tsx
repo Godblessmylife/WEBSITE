@@ -3,10 +3,11 @@ import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useKeyboardControls } from '@react-three/drei'
 import { Ecctrl, type EcctrlHandle } from 'ecctrl'
-import { useJoystickStore, useButtonStore } from 'ecctrl/input'
+import { useButtonStore } from 'ecctrl/input'
 import { useCustomGravity } from 'ecctrl/gravity'
 import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
+import { useSwipeControlStore } from '@/utils/swipeControlStore'
 import heroModelUrl from '../models/hero.glb'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
@@ -74,25 +75,25 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
 
     const godMode = useGodModeStore.getState().active
     const keys = getKeys()
-    const joystick = useJoystickStore.getState().joysticks.default
+    const swipe = useSwipeControlStore.getState()
     const jumpButton = useButtonStore.getState().buttons.jump
 
     // В God Mode Ecctrl не должен пытаться сам ходить/прыгать/поворачивать
     // персонажа обычным способом (ниже это делает отдельный useFrame с
     // приоритетом) — передаём ему "все клавиши отпущены", а не читаем
-    // joystick/jump, иначе ходьба и полёт будут пытаться управлять телом
+    // свайп/jump, иначе ходьба и полёт будут пытаться управлять телом
     // одновременно.
     handle.setMovement(
       godMode
         ? EMPTY_MOVEMENT
         : {
-            forward: keys.forward,
-            backward: keys.backward,
-            leftward: keys.leftward,
-            rightward: keys.rightward,
+            forward: keys.forward || swipe.forward,
+            backward: keys.backward || swipe.backward,
+            leftward: keys.leftward || swipe.leftward,
+            rightward: keys.rightward || swipe.rightward,
             run: keys.run,
             jump: keys.jump || !!jumpButton,
-            joystick: joystick?.active ? { x: joystick.x, y: joystick.y } : EMPTY_JOYSTICK,
+            joystick: EMPTY_JOYSTICK,
           },
     )
 

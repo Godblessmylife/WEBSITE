@@ -3,11 +3,12 @@ import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
-import { Joystick, VirtualButton } from 'ecctrl/input'
+import { VirtualButton } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
 import { useGodModeStore } from '@/utils/godModeStore'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
@@ -21,6 +22,7 @@ import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { Minimap, MinimapTracker } from './Minimap'
 import { SpaceZone, SPACE_TELEPORT_TARGET, SPACE_RETURN_PORTAL_POSITION } from './SpaceZone'
+import { SwipeControls } from './SwipeControls'
 import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
 
@@ -55,6 +57,18 @@ export function GameMode() {
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
   const godModeActive = useGodModeStore((s) => s.active)
   const toggleGodMode = useGodModeStore((s) => s.toggle)
+  const isMobile = useIsMobileViewport()
+
+  // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
+  // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
+  // иначе при меньшей ширине самих кнопок между ними осталась бы
+  // неоправданно большая дыра.
+  const btnPadding = isMobile ? '0.4rem 0.9rem' : '0.6rem 1.4rem'
+  const btnMinHeight = isMobile ? '2.1rem' : '2.75rem'
+  const btnFontSize = isMobile ? '0.8rem' : undefined
+  const btnGap = isMobile ? '6rem' : '9rem'
+  const btnGapRight = isMobile ? '5.5rem' : '8rem'
+  const edgeInset = isMobile ? '0.75rem' : '1.5rem'
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
@@ -115,10 +129,10 @@ export function GameMode() {
       <div
         style={{
           position: 'absolute',
-          top: 'calc(1.5rem + env(safe-area-inset-top))',
-          left: 'calc(1.5rem + env(safe-area-inset-left))',
-          padding: '0.6rem 1.4rem',
-          minHeight: '2.75rem',
+          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+          left: `calc(${edgeInset} + env(safe-area-inset-left))`,
+          padding: btnPadding,
+          minHeight: btnMinHeight,
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
@@ -127,6 +141,7 @@ export function GameMode() {
           borderRadius: '999px',
           color: '#ffe9b0',
           fontFamily: "'Orbitron', sans-serif",
+          fontSize: btnFontSize,
           zIndex: 1001,
         }}
       >
@@ -138,15 +153,16 @@ export function GameMode() {
         onClick={() => setLogOpen(!isLogOpen)}
         style={{
           position: 'absolute',
-          top: 'calc(1.5rem + env(safe-area-inset-top))',
-          left: 'calc(1.5rem + 9rem + env(safe-area-inset-left))',
-          padding: '0.6rem 1.4rem',
-          minHeight: '2.75rem',
+          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+          left: `calc(${edgeInset} + ${btnGap} + env(safe-area-inset-left))`,
+          padding: btnPadding,
+          minHeight: btnMinHeight,
           background: 'rgba(10, 17, 32, 0.6)',
           border: '1px solid rgba(255, 215, 106, 0.6)',
           borderRadius: '999px',
           color: '#ffe9b0',
           fontFamily: "'Orbitron', sans-serif",
+          fontSize: btnFontSize,
           cursor: 'pointer',
           touchAction: 'manipulation',
           zIndex: 1001,
@@ -159,15 +175,16 @@ export function GameMode() {
         onClick={toggleGodMode}
         style={{
           position: 'absolute',
-          top: 'calc(1.5rem + env(safe-area-inset-top))',
-          right: 'calc(1.5rem + 8rem + env(safe-area-inset-right))',
-          padding: '0.6rem 1.4rem',
-          minHeight: '2.75rem',
+          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+          right: `calc(${edgeInset} + ${btnGapRight} + env(safe-area-inset-right))`,
+          padding: btnPadding,
+          minHeight: btnMinHeight,
           background: godModeActive ? 'rgba(147, 92, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
           border: '1px solid rgba(147, 92, 255, 0.8)',
           borderRadius: '999px',
           color: godModeActive ? '#0c0518' : '#d7c3ff',
           fontFamily: "'Orbitron', sans-serif",
+          fontSize: btnFontSize,
           fontWeight: godModeActive ? 700 : 400,
           cursor: 'pointer',
           touchAction: 'manipulation',
@@ -181,15 +198,16 @@ export function GameMode() {
         onClick={() => setGameActive(false)}
         style={{
           position: 'absolute',
-          top: 'calc(1.5rem + env(safe-area-inset-top))',
-          right: 'calc(1.5rem + env(safe-area-inset-right))',
-          padding: '0.6rem 1.4rem',
-          minHeight: '2.75rem',
+          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+          right: `calc(${edgeInset} + env(safe-area-inset-right))`,
+          padding: btnPadding,
+          minHeight: btnMinHeight,
           background: 'rgba(10, 17, 32, 0.6)',
           border: '1px solid rgba(95, 212, 255, 0.6)',
           borderRadius: '999px',
           color: '#eafcff',
           fontFamily: "'Orbitron', sans-serif",
+          fontSize: btnFontSize,
           cursor: 'pointer',
           touchAction: 'manipulation',
           zIndex: 1001,
@@ -198,14 +216,13 @@ export function GameMode() {
         Выход
       </button>
 
-      {/* Тач-управление: DOM-оверлей, пишет в useJoystickStore/
-          useButtonStore (ecctrl/input). ВАЖНО: сам Ecctrl эти сторы не
-          читает — раньше здесь было утверждение, что читает, и клавиатура
-          была настроена ровно так же ошибочно (через drei
-          KeyboardControls, которую Ecctrl тоже не слушает сам). И то,
-          и другое приходится опрашивать вручную и передавать через
-          handle.setMovement() — см. PlayerCharacter.tsx. */}
-      <Joystick />
+      {/* Тач-управление: весь экран - направленный свайп (см.
+          SwipeControls.tsx) вместо джойстика ecctrl/input - по просьбе
+          клиента ("свайп вверх - вперёд" и т.д.), не требует попадать
+          пальцем в конкретную область экрана. Кнопка прыжка - по-прежнему
+          из ecctrl/input (useButtonStore), читается в PlayerCharacter.tsx
+          так же вручную, как раньше джойстик. */}
+      <SwipeControls />
       <VirtualButton id="jump" label="Прыжок" />
 
       {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована

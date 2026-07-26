@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import type { EcctrlHandle } from 'ecctrl'
 import { useGameDebugStore } from '@/utils/gameDebugStore'
 import { usePerfStore } from '@/utils/perfStore'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 
 const MAX_LOGGED_ERRORS = 3
 
@@ -41,6 +42,7 @@ export function GameDebugTracker({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHan
 export function GameDebugHUD() {
   const { fps, pos, isMoving, isOnGround, isFalling } = useGameDebugStore()
   const reduced = usePerfStore((s) => s.reduced)
+  const isMobile = useIsMobileViewport()
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
@@ -61,19 +63,19 @@ export function GameDebugHUD() {
     <div
       style={{
         position: 'absolute',
-        bottom: 'calc(1.5rem + env(safe-area-inset-bottom))',
-        left: 'calc(1.5rem + env(safe-area-inset-left))',
-        padding: '0.75rem 1rem',
+        bottom: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-bottom))`,
+        left: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-left))`,
+        padding: isMobile ? '0.4rem 0.6rem' : '0.75rem 1rem',
         background: 'rgba(5, 7, 13, 0.75)',
         border: '1px solid rgba(255, 255, 255, 0.15)',
-        borderRadius: '12px',
+        borderRadius: isMobile ? '8px' : '12px',
         color: '#9db2c9',
         fontFamily: 'monospace',
-        fontSize: '0.75rem',
-        lineHeight: 1.6,
+        fontSize: isMobile ? '0.6rem' : '0.75rem',
+        lineHeight: 1.5,
         zIndex: 1001,
         pointerEvents: 'none',
-        maxWidth: '320px',
+        maxWidth: isMobile ? '190px' : '320px',
       }}
     >
       <div style={{ color: '#5fd4ff' }}>DEBUG</div>

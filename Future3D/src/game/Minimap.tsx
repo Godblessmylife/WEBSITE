@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
 import { minimapPlayerStore } from '@/utils/minimapStore'
 import { useQuestStore } from '@/utils/questStore'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 
 // Половина стороны площадки (см. GameWorld.tsx: DesertGround 280x280).
 const WORLD_HALF = 140
@@ -151,6 +152,7 @@ export function Minimap() {
   const arrowRef = useRef<HTMLDivElement>(null!)
   const questStatus = useQuestStore((s) => s.status)
   const terrainUrl = useMemo(() => createMinimapTerrain(), [])
+  const isMobile = useIsMobileViewport()
 
   useEffect(() => {
     const unsub = minimapPlayerStore.subscribe((state) => {
@@ -169,10 +171,17 @@ export function Minimap() {
     <div
       style={{
         position: 'absolute',
-        bottom: 'calc(1.5rem + env(safe-area-inset-bottom))',
-        right: 'calc(1.5rem + env(safe-area-inset-right))',
+        bottom: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-bottom))`,
+        right: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-right))`,
         width: `${MAP_SIZE}px`,
         height: `${MAP_SIZE}px`,
+        // Масштаб вместо пересчёта MAP_SIZE - вся раскладка маркеров
+        // ниже завязана на этой константе (worldToMap), уменьшать сам
+        // размер пришлось бы регенерировать текстуру и координаты; scale
+        // с origin в правом нижнем углу (там, где карта и закреплена)
+        // просто сжимает готовую картинку, не трогая ни одну из формул.
+        transform: isMobile ? 'scale(0.68)' : undefined,
+        transformOrigin: 'bottom right',
         backgroundImage: `url(${terrainUrl})`,
         backgroundSize: 'cover',
         border: '1px solid rgba(255, 215, 106, 0.5)',
