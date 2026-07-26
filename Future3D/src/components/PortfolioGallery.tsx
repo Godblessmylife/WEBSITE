@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls, Stars } from '@react-three/drei'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
@@ -41,11 +41,44 @@ function GalleryCard({ index }: { index: number }) {
 // фиксированный div поверх всего сайта, пока isOpen. OrbitControls (как
 // в GameEntry) — покрутить/приблизить ряд карточек вместо перетаскивания
 // вручную, зум ограничен, чтобы весь ряд оставался в разумных пределах.
+//
+// Раньше оверлей был просто edge-to-edge канвасом без единого визуального
+// сигнала "это модалка поверх сайта" — по отзыву клиента непонятно, что
+// вообще открылось, а кнопка закрытия (полупрозрачная, тёмная на тёмном
+// звёздном фоне) терялась. Добавлены: инсетная рамка + виньетка (чисто
+// декоративные div'ы с pointerEvents:none, не мешают OrbitControls),
+// непрозрачная контрастная кнопка закрытия с иконкой, закрытие по Esc,
+// и плавное появление вместо мгновенного жёсткого переключения.
 export function PortfolioGallery() {
   const setOpen = useGalleryStore((s) => s.setOpen)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    // Двойной rAF, а не голый useEffect с visible=true сразу — браузер
+    // должен успеть замаунтить узел с opacity:0, иначе CSS-transition не
+    // увидит смену значения (сработает как будто opacity сразу была 1).
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [setOpen])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.25s ease',
+        background: '#05070d',
+      }}
+    >
       <Canvas camera={{ position: [0, 1.4, 9], fov: 50 }} style={{ touchAction: 'none' }}>
         <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
         <fog attach="fog" args={['#0a1120', 10, 32]} />
@@ -66,6 +99,21 @@ export function PortfolioGallery() {
         />
       </Canvas>
 
+      {/* Рамка + виньетка — чисто визуальные, pointerEvents:none, чтобы
+          не мешать OrbitControls под ними. Дают понять, что это отдельный
+          полноэкранный режим, а не часть обычной страницы. */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: '0.75rem',
+          border: '1px solid rgba(95, 212, 255, 0.35)',
+          borderRadius: '20px',
+          pointerEvents: 'none',
+          zIndex: 1001,
+          boxShadow: 'inset 0 0 120px rgba(0, 0, 0, 0.55)',
+        }}
+      />
+
       <p
         style={{
           position: 'absolute',
@@ -76,8 +124,9 @@ export function PortfolioGallery() {
           color: '#5fd4ff',
           letterSpacing: '0.2em',
           fontSize: '0.85rem',
-          zIndex: 1001,
+          zIndex: 1002,
           pointerEvents: 'none',
+          textShadow: '0 2px 12px rgba(5, 7, 13, 0.9)',
         }}
       >
         ГАЛЕРЕЯ ПРОЕКТОВ
@@ -89,18 +138,24 @@ export function PortfolioGallery() {
           position: 'absolute',
           top: 'calc(1.5rem + env(safe-area-inset-top))',
           right: 'calc(1.5rem + env(safe-area-inset-right))',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.4rem',
           padding: '0.6rem 1.4rem',
           minHeight: '2.75rem',
-          background: 'rgba(10, 17, 32, 0.6)',
-          border: '1px solid rgba(95, 212, 255, 0.6)',
+          background: 'rgba(95, 212, 255, 0.95)',
+          border: '1px solid #eafcff',
           borderRadius: '999px',
-          color: '#eafcff',
+          color: '#05070d',
           fontFamily: "'Orbitron', sans-serif",
+          fontWeight: 700,
           cursor: 'pointer',
           touchAction: 'manipulation',
-          zIndex: 1001,
+          zIndex: 1002,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
         }}
       >
+        <span aria-hidden="true">✕</span>
         Закрыть
       </button>
     </div>

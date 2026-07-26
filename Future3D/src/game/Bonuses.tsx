@@ -9,8 +9,14 @@ import { usePerfStore } from '@/utils/perfStore'
 const COLLECT_DISTANCE = 1.4
 const SCORE_PER_BONUS = 10
 
-// Разбросаны по площадке (140x140), не пересекаясь с пальмами
-// (PALM_POSITIONS в GameWorld.tsx) и порталом (10,0,-10).
+// Первые 8 (ближний кластер у спавна) — как было. Остальные 16 добавлены
+// по просьбе клиента при увеличении площадки до 280x280 (см. GameWorld.tsx)
+// - без них бонусы оставались только в старом радиусе ~10 у спавна, а
+// вся остальная (в разы бОльшая) карта не давала повода бегать дальше
+// портала. Координаты подобраны с запасом от построек MapProps.tsx
+// и горы (Mountain, (85,70), половина стороны ~46) — бонусы не физические
+// (только раскast-дистанция подбора), так что лёгкое визуальное
+// пересечение с декором не критично, важно не оказаться ВНУТРИ здания.
 const BONUS_POSITIONS: [number, number, number][] = [
   [6, 0.9, 6],
   [-6, 0.9, 5],
@@ -20,6 +26,22 @@ const BONUS_POSITIONS: [number, number, number][] = [
   [3, 0.9, 10],
   [-3, 0.9, 9],
   [6, 0.9, -6],
+  [35, 0.9, 35],
+  [-35, 0.9, 65],
+  [55, 0.9, 5],
+  [-38, 0.9, -38],
+  [45, 0.9, -65],
+  [-15, 0.9, 55],
+  [15, 0.9, -55],
+  [75, 0.9, -10],
+  [-75, 0.9, 10],
+  [30, 0.9, 60],
+  [100, 0.9, -20],
+  [-100, 0.9, 60],
+  [20, 0.9, -90],
+  [-90, 0.9, -20],
+  [90, 0.9, 40],
+  [-20, 0.9, -100],
 ]
 
 const bonusWorldPos = new THREE.Vector3()
@@ -61,12 +83,16 @@ function BonusOrb({ position, withLight }: { position: [number, number, number];
 // GameMode целиком размонтируется при выходе из игры (isGameActive),
 // так что при следующем заходе компонент создаётся заново и все бонусы
 // автоматически на месте — отдельно сбрасывать нечего.
+// Динамический pointLight выдаётся только ближнему кластеру у спавна
+// (первые 8 из 24) даже при полном качестве - 24 одновременных
+// источника света обошлись бы дороже, чем стоит эффект, когда бОльшая
+// часть карты всё равно освещена DesertSun. У остальных 16 свечение
+// только за счёт emissive-материала (без реального света) - на глаз
+// орб всё ещё сияет, просто не подсвечивает песок вокруг себя.
+const LIT_BONUS_COUNT = 8
+
 export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const addScore = useGameStore((s) => s.addScore)
-  // 8 одновременных точечных источников света (по одному на бонус) —
-  // на слабых устройствах/просевшем fps самая дорогая часть этой сцены
-  // после теней. Свечение остаётся (emissive-материал + Bloom), убирается
-  // только настоящий динамический свет.
   const reduced = usePerfStore((s) => s.reduced)
   const [collected, setCollected] = useState<boolean[]>(() => BONUS_POSITIONS.map(() => false))
   const collectedRef = useRef(collected)
@@ -90,7 +116,9 @@ export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | nul
   return (
     <>
       {BONUS_POSITIONS.map((pos, i) =>
-        collected[i] ? null : <BonusOrb key={i} position={pos} withLight={!reduced} />,
+        collected[i] ? null : (
+          <BonusOrb key={i} position={pos} withLight={!reduced && i < LIT_BONUS_COUNT} />
+        ),
       )}
     </>
   )

@@ -17,6 +17,7 @@ import { QuestItem } from './QuestItem'
 import { QuestDialogue, QuestLog } from './QuestUI'
 import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
+import { Minimap, MinimapTracker } from './Minimap'
 import { GameLoadingScreen } from './GameLoadingScreen'
 
 const KEYBOARD_MAP = [
@@ -77,6 +78,7 @@ export function GameMode() {
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
         <GameDebugTracker ecctrlRef={ecctrlRef} />
+        <MinimapTracker ecctrlRef={ecctrlRef} />
       </Canvas>
 
       <div
@@ -157,6 +159,7 @@ export function GameMode() {
           до конца. Убрать (или спрятать за флагом), когда перестанет
           быть нужен. */}
       <GameDebugHUD />
+      <Minimap />
 
       <QuestLog />
       <QuestDialogue />

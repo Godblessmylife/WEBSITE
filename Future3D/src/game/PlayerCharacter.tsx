@@ -18,6 +18,7 @@ const MODEL_Y_OFFSET = -(CAPSULE_HALF_HEIGHT + CAPSULE_RADIUS)
 export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const { scene } = useGLTF(heroModelUrl)
   const tiltRef = useRef<THREE.Group>(null!)
+  const bobPhaseRef = useRef(0)
   const [, getKeys] = useKeyboardControls()
 
   // Это НЕ автоматическое поведение ecctrl (в отличие от предположения
@@ -46,13 +47,30 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       joystick: joystick?.active ? { x: joystick.x, y: joystick.y } : EMPTY_JOYSTICK,
     })
 
-    // hero.glb без скелета и анимаций (проверено) — вместо ходьбы/бега
-    // персонаж наклоняется вперёд пропорционально скорости движения,
-    // отдельно обозначенное клиенту временное решение.
+    // hero.glb без скелета и анимаций (перепроверено gltf-transform
+    // inspect — ни одного clip, ни одного skin) — настоящую анимацию
+    // ходьбы/бега сделать нельзя без другой модели. Вместо неподвижного
+    // скольжения — три процедурных сигнала, вместе дающие "живую" походку:
+    // наклон вперёд от скорости (было раньше) + вертикальный подскок
+    // (bobPhase) + покачивание из стороны в сторону в той же фазе,
+    // имитирующее перенос веса с ноги на ногу. Фаза считается от
+    // ПРОЙДЕННОГО пути (speed * delta), а не от времени — иначе частота
+    // "шагов" не менялась бы с ускорением при беге на Shift.
     const speed = handle.relativeVelOnPlane.length()
     const targetTilt = handle.isMoving ? THREE.MathUtils.clamp(speed * 0.05, 0, 0.22) : 0
     const damp = 1 - Math.exp(-8 * delta)
     tiltRef.current.rotation.x = THREE.MathUtils.lerp(tiltRef.current.rotation.x, targetTilt, damp)
+
+    if (handle.isMoving && speed > 0.05) {
+      bobPhaseRef.current += speed * delta * 2.2
+      const bob = Math.abs(Math.sin(bobPhaseRef.current))
+      const sway = Math.sin(bobPhaseRef.current)
+      tiltRef.current.position.y = bob * 0.06
+      tiltRef.current.rotation.z = THREE.MathUtils.lerp(tiltRef.current.rotation.z, sway * 0.05, damp)
+    } else {
+      tiltRef.current.position.y = THREE.MathUtils.lerp(tiltRef.current.position.y, 0, damp)
+      tiltRef.current.rotation.z = THREE.MathUtils.lerp(tiltRef.current.rotation.z, 0, damp)
+    }
   })
 
   return (
@@ -67,7 +85,12 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       position={[0, 2, 0]}
       capsuleHalfHeight={CAPSULE_HALF_HEIGHT}
       capsuleRadius={CAPSULE_RADIUS}
-      maxRunVel={7}
+      // По просьбе клиента Shift должен ускорять бег втрое относительно
+      // обычной ходьбы (дефолты ecctrl: maxWalkVel=2, maxRunVel=5) —
+      // явно задаём обе константы, а не только run, чтобы соотношение
+      // было точным, а не "что получится" от дефолтного walk.
+      maxWalkVel={3}
+      maxRunVel={9}
     >
       <group ref={tiltRef}>
         <primitive object={scene} position={[0, MODEL_Y_OFFSET, 0]} />
