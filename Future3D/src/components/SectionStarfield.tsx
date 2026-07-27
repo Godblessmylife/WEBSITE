@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
 import type { Group } from 'three'
+import { useGameStore } from '@/utils/gameStore'
 
 // Общий анимированный звёздный фон для обычных DOM-секций (О нас, Цены,
 // Контакты) — тот же приём "игрового меню", что уже стоит под карточками
@@ -23,6 +24,13 @@ function RotatingStars() {
 }
 
 export function SectionStarfield() {
+  // Используется в трёх секциях (О нас/Цены/Контакты) - три отдельных
+  // WebGL-контекста, ни один из них не размонтируется, пока идёт игра.
+  // См. подробное объяснение в JourneyScene.tsx (тот же клиентский баг:
+  // "вылетает" на мобильном от лишних одновременно живых контекстов).
+  const isGameActive = useGameStore((s) => s.isGameActive)
+  if (isGameActive) return null
+
   return (
     <div
       style={{

@@ -4,6 +4,7 @@ import { Environment, OrbitControls, Stars } from '@react-three/drei'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
 import { useGalleryStore } from '@/utils/galleryStore'
+import { useGameStore } from '@/utils/gameStore'
 
 const GALLERY_COUNT = 7
 const CARD_SPACING = 2.1
@@ -51,6 +52,7 @@ function GalleryCard({ index }: { index: number }) {
 // и плавное появление вместо мгновенного жёсткого переключения.
 export function PortfolioGallery() {
   const setOpen = useGalleryStore((s) => s.setOpen)
+  const isGameActive = useGameStore((s) => s.isGameActive)
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -67,6 +69,11 @@ export function PortfolioGallery() {
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [setOpen])
+
+  // Открыть галерею одновременно с игрой в обычном UI-потоке нельзя, но
+  // на всякий случай - лишний живой WebGL-контекст на мобильном опаснее,
+  // чем пропущенный рендер (см. подробности в JourneyScene.tsx).
+  if (isGameActive) return null
 
   return (
     <div

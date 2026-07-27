@@ -11,6 +11,7 @@ import { SpaceTravelEffect } from './SpaceTravelEffect'
 import { FloatingClock } from './FloatingClock'
 import { Effects } from '@/effects/Effects'
 import { usePerfStore } from '@/utils/perfStore'
+import { useGameStore } from '@/utils/gameStore'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 
 export function JourneyScene() {
@@ -23,6 +24,25 @@ export function JourneyScene() {
   // (touch/мало ядер CPU) — ещё и по реальному fps через
   // AdaptivePerformance ниже.
   const reduced = usePerfStore((s) => s.reduced)
+
+  // По жалобе клиента: игра на мобильных вылетала от малейшего лага,
+  // особенно рядом с бонусами/на резких поворотах - то есть именно там,
+  // где на экран одномоментно приходится больше всего работы. Причина
+  // не в самой игре: этот Canvas (полный пайплайн путешествия - Bloom,
+  // хроматическая аберрация, десяток моделей) НИКОГДА не размонтировался
+  // и продолжал рендериться на полной скорости, даже когда GameMode
+  // (СВОЙ отдельный Canvas/WebGL-контекст) рисуется поверх него на весь
+  // экран - плюс к этому у секций О нас/Цены/Контакты/Портфолио/START
+  // ещё 4 собственных Canvas (см. SectionStarfield.tsx, PortfolioCarousel
+  // .tsx, GameEntry.tsx), которые ТОЖЕ никогда не размонтируются. На
+  // мобильном GPU одновременно несколько WebGL-контекстов - типичная
+  // причина потери контекста ("вылетает") под malейшей дополнительной
+  // нагрузкой, особенно в Safari на iOS, который агрессивно убивает
+  // контексты при нехватке видеопамяти. Пока идёт игра, путешествие всё
+  // равно полностью закрыто фикс-оверлеем GameMode - не размонтировать
+  // его смысла нет.
+  const isGameActive = useGameStore((s) => s.isGameActive)
+  if (isGameActive) return null
 
   return (
     <Canvas

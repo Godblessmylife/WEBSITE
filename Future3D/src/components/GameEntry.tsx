@@ -133,6 +133,7 @@ function Computer() {
 // зум колёсиком/щипком без написания своей логики.
 export function GameEntry() {
   const setGameActive = useGameStore((s) => s.setGameActive)
+  const isGameActive = useGameStore((s) => s.isGameActive)
   usePrefetchGame()
 
   return (
@@ -145,29 +146,35 @@ export function GameEntry() {
           'radial-gradient(circle at 50% 38%, #182a45 0%, #0a1120 45%, #05070d 85%)',
       }}
     >
-      {/* touchAction: 'none' — иначе на телефоне жест вращения камеры
-          (OrbitControls) конкурирует со скроллом страницы через тот же
-          палец на канвасе. */}
-      <Canvas camera={{ position: [0, 2.4, 5.8], fov: 45 }} style={{ touchAction: 'none' }}>
-        {/* тот же "игровое меню" фон, что и под карточками портфолио */}
-        <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
-        <fog attach="fog" args={['#0a1120', 10, 30]} />
+      {/* Пока идёт игра, этот Canvas всё равно полностью закрыт
+          фикс-оверлеем GameMode - не рендерим его совсем, лишний живой
+          WebGL-контекст на мобильном (см. подробности в JourneyScene.tsx,
+          тот же клиентский баг "вылетает от малейшего лага"). */}
+      {!isGameActive && (
+        // touchAction: 'none' — иначе на телефоне жест вращения камеры
+        // (OrbitControls) конкурирует со скроллом страницы через тот же
+        // палец на канвасе.
+        <Canvas camera={{ position: [0, 2.4, 5.8], fov: 45 }} style={{ touchAction: 'none' }}>
+          {/* тот же "игровое меню" фон, что и под карточками портфолио */}
+          <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
+          <fog attach="fog" args={['#0a1120', 10, 30]} />
 
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[3, 5, 4]} intensity={1.3} />
-        <pointLight position={[0, 2.5, 1]} color="#5fd4ff" intensity={2.5} distance={9} />
-        <Computer />
-        <StartPlate onActivate={() => setGameActive(true)} />
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[3, 5, 4]} intensity={1.3} />
+          <pointLight position={[0, 2.5, 1]} color="#5fd4ff" intensity={2.5} distance={9} />
+          <Computer />
+          <StartPlate onActivate={() => setGameActive(true)} />
 
-        <OrbitControls
-          target={[0, 1.5, 0]}
-          enablePan={false}
-          minDistance={2.5}
-          maxDistance={9}
-          minPolarAngle={Math.PI / 4}
-          maxPolarAngle={Math.PI / 1.7}
-        />
-      </Canvas>
+          <OrbitControls
+            target={[0, 1.5, 0]}
+            enablePan={false}
+            minDistance={2.5}
+            maxDistance={9}
+            minPolarAngle={Math.PI / 4}
+            maxPolarAngle={Math.PI / 1.7}
+          />
+        </Canvas>
+      )}
     </section>
   )
 }

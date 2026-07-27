@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
 import { useGalleryStore } from '@/utils/galleryStore'
+import { useGameStore } from '@/utils/gameStore'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -76,8 +77,13 @@ function Carousel({ dragRef, rotationRef }: { dragRef: RefObject<DragState>; rot
 // спейсер заканчивается, sticky-блок естественно "отпускает" 3D-сцену
 // и она уходит вверх экрана, открывая эту секцию — без ручного JS.
 export function PortfolioCarousel() {
+  // Не размонтировался, пока идёт игра - лишний живой WebGL-контекст на
+  // мобильном (см. подробности в JourneyScene.tsx).
+  const isGameActive = useGameStore((s) => s.isGameActive)
   const dragRef = useRef<DragState>({ active: false, lastX: 0, velocity: 0.15 })
   const rotationRef = useRef(0)
+
+  if (isGameActive) return null
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     dragRef.current.active = true
