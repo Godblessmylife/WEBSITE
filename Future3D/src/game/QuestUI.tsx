@@ -1,16 +1,6 @@
 import type { CSSProperties } from 'react'
-import { useQuestStore } from '@/utils/questStore'
+import { QUESTS, areAllQuestsDone, useQuestStore } from '@/utils/questStore'
 import { useGameStore } from '@/utils/gameStore'
-
-const QUEST_TITLE = 'Пропавший нож'
-const TURN_IN_REWARD = 50
-
-const STATUS_LABEL: Record<string, string> = {
-  not_started: 'Не начат',
-  active: 'В процессе',
-  ready_to_turn_in: 'Готов к сдаче',
-  completed: 'Завершён',
-}
 
 const panelStyle: CSSProperties = {
   position: 'absolute',
@@ -57,11 +47,14 @@ const closeButtonStyle: CSSProperties = {
 }
 
 // Диалог NPC — открывается кликом по QuestNpc (см. game/QuestNpc.tsx).
-// Текст/кнопка зависят от текущего статуса квеста, как в WoW: одна и та
-// же реплика NPC ведёт к разным действиям в зависимости от прогресса.
+// Текст/кнопка зависят от текущего задания в цепочке (QUESTS[questIndex],
+// см. questStore.ts) и его фазы, как в WoW: одна и та же реплика NPC
+// ведёт к разным действиям в зависимости от прогресса. После сдачи
+// последнего квеста NPC остаётся с финальной репликой без действий.
 export function QuestDialogue() {
   const isOpen = useQuestStore((s) => s.isDialogueOpen)
-  const status = useQuestStore((s) => s.status)
+  const questIndex = useQuestStore((s) => s.questIndex)
+  const phase = useQuestStore((s) => s.phase)
   const acceptQuest = useQuestStore((s) => s.acceptQuest)
   const turnIn = useQuestStore((s) => s.turnIn)
   const setDialogueOpen = useQuestStore((s) => s.setDialogueOpen)
@@ -69,25 +62,26 @@ export function QuestDialogue() {
 
   if (!isOpen) return null
 
+  const quest = QUESTS[questIndex]
   let line: string
   let action: { label: string; onClick: () => void } | null = null
 
-  if (status === 'not_started') {
-    line = 'Мне нужен нож для дела. Найдёшь его на площадке — принеси мне.'
+  if (areAllQuestsDone({ questIndex, phase })) {
+    line = 'Ещё раз спасибо за помощь, путник. Больше дел для тебя пока нет.'
+  } else if (phase === 'not_started') {
+    line = quest.npc.offer
     action = { label: 'Принять задание', onClick: acceptQuest }
-  } else if (status === 'active') {
-    line = 'Нож ещё у тебя? Он лежит где-то здесь, на площадке — поищи.'
-  } else if (status === 'ready_to_turn_in') {
-    line = 'О, ты нашёл нож! Спасибо тебе, держи награду.'
+  } else if (phase === 'active') {
+    line = quest.npc.inProgress
+  } else {
+    line = quest.npc.turnIn
     action = {
       label: 'Сдать задание',
       onClick: () => {
         turnIn()
-        addScore(TURN_IN_REWARD)
+        addScore(quest.reward)
       },
     }
-  } else {
-    line = 'Ещё раз спасибо за помощь, путник.'
   }
 
   return (
@@ -111,12 +105,14 @@ export function QuestDialogue() {
 }
 
 // Журнал квестов — открывается кнопкой "Квесты" в HUD игры (см.
-// GameMode.tsx), независимо от диалога с NPC. Пока квест один — список
-// из одной записи, тот же принцип, что и в questStore.ts (расширить на
-// массив, когда появится второй квест).
+// GameMode.tsx), независимо от диалога с NPC. Список из всех трёх
+// заданий цепочки сразу (QUESTS, questStore.ts): пройденные — "Завершён",
+// текущее — его реальный статус и подсказка, ещё не открытые — "Ещё не
+// доступен", чтобы игрок видел, сколько всего заданий у странника.
 export function QuestLog() {
   const isOpen = useQuestStore((s) => s.isLogOpen)
-  const status = useQuestStore((s) => s.status)
+  const questIndex = useQuestStore((s) => s.questIndex)
+  const phase = useQuestStore((s) => s.phase)
   const setLogOpen = useQuestStore((s) => s.setLogOpen)
 
   if (!isOpen) return null
@@ -128,6 +124,8 @@ export function QuestLog() {
         top: 'calc(5rem + env(safe-area-inset-top))',
         left: 'calc(1.5rem + env(safe-area-inset-left))',
         width: '280px',
+        maxHeight: '70vh',
+        overflowY: 'auto',
         padding: '1rem 1.25rem',
         background: 'rgba(10, 17, 32, 0.9)',
         border: '1px solid rgba(255, 215, 106, 0.5)',
@@ -155,16 +153,48 @@ export function QuestLog() {
           ✕
         </button>
       </div>
-      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.9rem' }}>
-        <div style={{ fontWeight: 600 }}>{QUEST_TITLE}</div>
-        <div style={{ color: '#9db2c9', fontSize: '0.8rem', margin: '0.3rem 0' }}>{STATUS_LABEL[status]}</div>
-        <div style={{ color: '#c3d3e6', fontSize: '0.85rem' }}>
-          {status === 'not_started' && 'Поговори со странником рядом со спавном.'}
-          {status === 'active' && 'Найди нож на площадке.'}
-          {status === 'ready_to_turn_in' && 'Верни нож страннику.'}
-          {status === 'completed' && `Награда получена: +${TURN_IN_REWARD} очков.`}
-        </div>
-      </div>
+      {QUESTS.map((quest, i) => {
+        const isPast = i < questIndex
+        const isCurrent = i === questIndex
+        const isDone = isPast || (isCurrent && phase === 'completed')
+
+        let statusLabel: string
+        let hintText: string
+        if (isDone) {
+          statusLabel = 'Завершён'
+          hintText = `Награда получена: +${quest.reward} очков.`
+        } else if (isCurrent && phase === 'active') {
+          statusLabel = 'В процессе'
+          hintText = quest.hint.active
+        } else if (isCurrent && phase === 'ready_to_turn_in') {
+          statusLabel = 'Готов к сдаче'
+          hintText = quest.hint.ready
+        } else if (isCurrent) {
+          statusLabel = 'Не начат'
+          hintText = 'Поговори со странником рядом со спавном.'
+        } else {
+          statusLabel = 'Ещё не доступен'
+          hintText = 'Сначала заверши предыдущее задание.'
+        }
+
+        return (
+          <div
+            key={quest.id}
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '0.9rem',
+              marginBottom: i < QUESTS.length - 1 ? '0.75rem' : 0,
+              paddingBottom: i < QUESTS.length - 1 ? '0.75rem' : 0,
+              borderBottom: i < QUESTS.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+              opacity: !isDone && !isCurrent ? 0.55 : 1,
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{quest.title}</div>
+            <div style={{ color: '#9db2c9', fontSize: '0.8rem', margin: '0.3rem 0' }}>{statusLabel}</div>
+            <div style={{ color: '#c3d3e6', fontSize: '0.85rem' }}>{hintText}</div>
+          </div>
+        )
+      })}
     </div>
   )
 }

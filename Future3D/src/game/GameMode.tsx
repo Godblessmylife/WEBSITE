@@ -17,6 +17,8 @@ import { Portal } from './Portal'
 import { Bonuses } from './Bonuses'
 import { QuestNpc } from './QuestNpc'
 import { QuestItem } from './QuestItem'
+import { QuestObjectiveRocket } from './QuestObjectiveRocket'
+import { QuestObjectiveChip } from './QuestObjectiveChip'
 import { QuestDialogue, QuestLog } from './QuestUI'
 import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
@@ -69,6 +71,11 @@ export function GameMode() {
   const btnGap = isMobile ? '6rem' : '9rem'
   const btnGapRight = isMobile ? '5.5rem' : '8rem'
   const edgeInset = isMobile ? '0.75rem' : '1.5rem'
+  // Ширина мини-карты (Minimap.tsx: MAP_SIZE=168px, на мобильном
+  // transform: scale(0.5)) - кнопки "Прыжок"/"Вверх"/"Вниз" сдвинуты на
+  // это расстояние левее нижнего правого угла, чтобы не оказаться под
+  // мини-картой (та же зона экрана, но у карты z-index выше).
+  const minimapClearance = isMobile ? '96px' : '180px'
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
@@ -111,6 +118,8 @@ export function GameMode() {
             <Bonuses ecctrlRef={ecctrlRef} />
             <QuestNpc />
             <QuestItem ecctrlRef={ecctrlRef} />
+            <QuestObjectiveRocket ecctrlRef={ecctrlRef} />
+            <QuestObjectiveChip ecctrlRef={ecctrlRef} />
             <Portal ecctrlRef={ecctrlRef} position={DESERT_PORTAL_POSITION} target={SPACE_TELEPORT_TARGET} />
             <Portal
               ecctrlRef={ecctrlRef}
@@ -221,9 +230,48 @@ export function GameMode() {
           клиента ("свайп вверх - вперёд" и т.д.), не требует попадать
           пальцем в конкретную область экрана. Кнопка прыжка - по-прежнему
           из ecctrl/input (useButtonStore), читается в PlayerCharacter.tsx
-          так же вручную, как раньше джойстик. */}
+          так же вручную, как раньше джойстик. В God Mode та же кнопка
+          работает как "вверх" (подъём при полёте, см. PlayerCharacter.tsx)
+          - подпись меняется, чтобы не вводить в заблуждение. Явные
+          buttonWrapperStyle вместо дефолтной позиции ecctrl/input (fixed
+          без отступов, z-index:10) нужны по двум причинам, обе найдены
+          автоматизированной проверкой скриншотом: (1) без сдвига кнопка
+          пряталась бы ПОД мини-картой (та же нижняя-правая область, но у
+          карты z-index:1001); (2) z-index:10 у дефолтного стиля кнопки
+          НИЖЕ, чем у SwipeControls (z-index:999, весь экран, inset:0) -
+          то есть полноэкранный слой свайпа перехватывал ЛЮБОЙ тап в
+          области кнопки ДО того, как он доходил до самой кнопки (эта
+          часть бага была не только в God Mode - кнопка "Прыжок" так же
+          не реагировала на тач и в обычном режиме, просто раньше это не
+          проверялось отдельно от свайпа). zIndex:1001 поднимает кнопку
+          выше слоя свайпа. */}
       <SwipeControls />
-      <VirtualButton id="jump" label="Прыжок" />
+      <VirtualButton
+        id="jump"
+        label={godModeActive ? 'Вверх' : 'Прыжок'}
+        buttonWrapperStyle={{
+          bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
+          right: `calc(${edgeInset} + ${minimapClearance} + env(safe-area-inset-right))`,
+          left: 'auto',
+          top: 'auto',
+          zIndex: 1001,
+        }}
+      />
+      {/* Кнопка "Вниз" - только в God Mode (в обычном режиме спуска нет и
+          клавиша Ctrl/C тоже ничего не делает, см. PlayerCharacter.tsx). */}
+      {godModeActive && (
+        <VirtualButton
+          id="descend"
+          label="Вниз"
+          buttonWrapperStyle={{
+            bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
+            right: `calc(${edgeInset} + ${minimapClearance} + 76px + env(safe-area-inset-right))`,
+            left: 'auto',
+            zIndex: 1001,
+            top: 'auto',
+          }}
+        />
+      )}
 
       {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована
           до конца. Убрать (или спрятать за флагом), когда перестанет

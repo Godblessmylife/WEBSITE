@@ -65,17 +65,21 @@ export function GameDebugHUD() {
         position: 'absolute',
         bottom: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-bottom))`,
         left: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-left))`,
-        padding: isMobile ? '0.4rem 0.6rem' : '0.75rem 1rem',
+        // По просьбе клиента окно вдвое компактнее на мобильном: padding
+        // и maxWidth уменьшены примерно в 2 раза от прежних мобильных
+        // значений, fontSize/lineHeight уменьшены чуть меньше (иначе текст
+        // стал бы нечитаемым на маленьком экране).
+        padding: isMobile ? '0.2rem 0.35rem' : '0.75rem 1rem',
         background: 'rgba(5, 7, 13, 0.75)',
         border: '1px solid rgba(255, 255, 255, 0.15)',
-        borderRadius: isMobile ? '8px' : '12px',
+        borderRadius: isMobile ? '6px' : '12px',
         color: '#9db2c9',
         fontFamily: 'monospace',
-        fontSize: isMobile ? '0.6rem' : '0.75rem',
-        lineHeight: 1.5,
+        fontSize: isMobile ? '0.45rem' : '0.75rem',
+        lineHeight: isMobile ? 1.3 : 1.5,
         zIndex: 1001,
         pointerEvents: 'none',
-        maxWidth: isMobile ? '190px' : '320px',
+        maxWidth: isMobile ? '105px' : '320px',
       }}
     >
       <div style={{ color: '#5fd4ff' }}>DEBUG</div>

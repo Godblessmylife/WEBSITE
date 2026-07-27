@@ -13,6 +13,8 @@ const COLLECT_DISTANCE = 1.6
 // потерять на песке.
 const SCALE = 3
 const ITEM_POSITION = new THREE.Vector3(25, 0.02, -15)
+// Индекс этого квеста в QUESTS (questStore.ts) — первый в цепочке из трёх.
+const QUEST_INDEX = 0
 
 // Виден только пока квест активен и ещё не собран (см. questStore) —
 // после handle.collectItem() статус меняется на ready_to_turn_in и этот
@@ -36,19 +38,21 @@ function KnifeModel() {
 }
 
 export function QuestItem({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
-  const status = useQuestStore((s) => s.status)
-  const collectItem = useQuestStore((s) => s.collectItem)
+  const questIndex = useQuestStore((s) => s.questIndex)
+  const phase = useQuestStore((s) => s.phase)
+  const completeObjective = useQuestStore((s) => s.completeObjective)
+  const isActive = questIndex === QUEST_INDEX && phase === 'active'
 
   useFrame(() => {
-    if (status !== 'active') return
+    if (!isActive) return
     const handle = ecctrlRef.current
     if (!handle) return
     if (handle.currPos.distanceTo(ITEM_POSITION) < COLLECT_DISTANCE) {
-      collectItem()
+      completeObjective()
     }
   })
 
-  if (status !== 'active') return null
+  if (!isActive) return null
   return <KnifeModel />
 }
 

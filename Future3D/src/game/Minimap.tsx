@@ -48,10 +48,20 @@ const STATIC_MARKERS: { type: MarkerType; x: number; z: number; label: string }[
   { type: 'decor', x: 60, z: -50, label: 'Автомат' },
   { type: 'decor', x: 60, z: -30, label: 'Автомат 2' },
   { type: 'mountain', x: 85, z: 70, label: 'Гора' },
+  { type: 'decor', x: -12, z: 4, label: 'Машины' },
 ]
 
 const NPC_MARKER = { x: 2, z: 4 }
-const QUEST_ITEM_MARKER = { x: 25, z: -15 }
+// Позиции целей квестов 0/1/2 из questStore.ts (QUESTS) — индекс массива
+// совпадает с questIndex. Те же координаты, что и у ножа (QuestItem.tsx),
+// ракеты (QuestObjectiveRocket.tsx) и фишки (QuestObjectiveChip.tsx) -
+// намеренное дублирование, как и у остальных построек (см. комментарий
+// у STATIC_MARKERS выше).
+const QUEST_OBJECTIVE_MARKERS = [
+  { x: 25, z: -15 },
+  { x: -22, z: -28 },
+  { x: 60, z: -40 },
+]
 const MOUNTAIN_MARKER = { x: 85, z: 70 }
 
 // Раньше фон карты был плоской заливкой (rgba тёмно-синего) - по отзыву
@@ -150,7 +160,8 @@ export function MinimapTracker({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandl
 // нагрузкой ровно там, где клиент просил "оптимизированнее".
 export function Minimap() {
   const arrowRef = useRef<HTMLDivElement>(null!)
-  const questStatus = useQuestStore((s) => s.status)
+  const questIndex = useQuestStore((s) => s.questIndex)
+  const questPhase = useQuestStore((s) => s.phase)
   const terrainUrl = useMemo(() => createMinimapTerrain(), [])
   const isMobile = useIsMobileViewport()
 
@@ -163,9 +174,10 @@ export function Minimap() {
     return unsub
   }, [])
 
-  const npcActionable = questStatus === 'not_started' || questStatus === 'ready_to_turn_in'
+  const npcActionable = questPhase === 'not_started' || questPhase === 'ready_to_turn_in'
   const npcPos = worldToMap(NPC_MARKER.x, NPC_MARKER.z)
-  const itemPos = worldToMap(QUEST_ITEM_MARKER.x, QUEST_ITEM_MARKER.z)
+  const objectiveMarker = QUEST_OBJECTIVE_MARKERS[questIndex]
+  const itemPos = worldToMap(objectiveMarker.x, objectiveMarker.z)
 
   return (
     <div
@@ -180,7 +192,9 @@ export function Minimap() {
         // размер пришлось бы регенерировать текстуру и координаты; scale
         // с origin в правом нижнем углу (там, где карта и закреплена)
         // просто сжимает готовую картинку, не трогая ни одну из формул.
-        transform: isMobile ? 'scale(0.68)' : undefined,
+        // Уменьшено с 0.68 до 0.5 по повторной просьбе клиента - ещё
+        // компактнее на мобильном.
+        transform: isMobile ? 'scale(0.5)' : undefined,
         transformOrigin: 'bottom right',
         backgroundImage: `url(${terrainUrl})`,
         backgroundSize: 'cover',
@@ -234,7 +248,7 @@ export function Minimap() {
         }}
       />
 
-      {questStatus === 'active' && (
+      {questPhase === 'active' && (
         <div
           style={{
             position: 'absolute',

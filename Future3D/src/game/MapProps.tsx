@@ -9,6 +9,8 @@ import npc2Url from '../models/npc2.glb'
 import slotUrl from '../models/slot.glb'
 import slot2Url from '../models/slot2.glb'
 import ostrovokUrl from '../models/ostrovok.glb'
+import car1Url from '../models/Car1.glb'
+import car2Url from '../models/car2.glb'
 
 // Коллайдеры — ЯВНЫЕ CuboidCollider с размерами/центром, посчитанными из
 // реального bbox моделей (gltf-transform inspect), а НЕ colliders="cuboid"
@@ -160,6 +162,33 @@ function Mountain() {
   )
 }
 
+// Обе машины (bbox посчитан gltf-transform inspect по присланным файлам,
+// scale=1 у обеих) поставлены рядом со спавном персонажа ([0,2,0] в
+// PlayerCharacter.tsx), но в стороне от пальм/бонусов/странника у спавна
+// (см. PALM_POSITIONS в GameWorld.tsx и BONUS_POSITIONS в Bonuses.tsx) -
+// на западе, где рядом со спавном ничего больше не стоит.
+function Car1Model() {
+  const { scene } = useGLTF(car1Url)
+  // bbox: (-2.341,-0.016,-0.976) .. (2.235,1.043,0.976)
+  return (
+    <RigidBody type="fixed" colliders={false} position={[-11, 0.01595, 2]}>
+      <CuboidCollider args={[2.288, 0.529, 0.976]} position={[-0.026, 0.513, 0]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
+function Car2Model() {
+  const { scene } = useGLTF(car2Url)
+  // bbox: (-0.597,-0.004,-1.356) .. (0.597,0.849,1.396)
+  return (
+    <RigidBody type="fixed" colliders={false} position={[-13, 0.00434, 6.5]}>
+      <CuboidCollider args={[0.597, 0.427, 1.376]} position={[0, 0.427, 0.02]} />
+      <primitive object={scene} />
+    </RigidBody>
+  )
+}
+
 // Дополнительные постройки на карте — по просьбе клиента. Раскиданы
 // подальше от стартового кластера (спавн, бонусы в радиусе ~10, портал
 // на (10,0,-10)), но всё ещё в пределах увеличенной площадки 280x280
@@ -176,6 +205,8 @@ export function MapProps() {
       <SlotMachine />
       <SlotMachine2 />
       <Mountain />
+      <Car1Model />
+      <Car2Model />
     </>
   )
 }
@@ -189,3 +220,5 @@ useGLTF.preload(npc2Url)
 useGLTF.preload(slotUrl)
 useGLTF.preload(slot2Url)
 useGLTF.preload(ostrovokUrl)
+useGLTF.preload(car1Url)
+useGLTF.preload(car2Url)

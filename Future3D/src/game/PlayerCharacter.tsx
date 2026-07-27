@@ -158,17 +158,29 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       wasGodModeRef.current = true
     }
 
+    // БАГ (по отзыву клиента: "после God Mode на мобильном сенсорное
+    // управление пропадает"): этот блок раньше читал ТОЛЬКО getKeys()
+    // (клавиатура). На телефоне физической клавиатуры нет, поэтому в
+    // God Mode все клавиши всегда "отпущены" и полёт не реагировал вообще
+    // ни на что — выглядело так, будто тач-управление перестало работать
+    // (на самом деле оно и не подключалось к этой ветке). Свайп (обычное
+    // движение) и кнопка "Прыжок"/"Вниз" (ecctrl/input, GameMode.tsx)
+    // теперь читаются наравне с клавиатурой, как и в обычном режиме выше.
     const keys = getKeys()
-    if (keys.leftward) yawRef.current += GOD_YAW_SPEED * delta
-    if (keys.rightward) yawRef.current -= GOD_YAW_SPEED * delta
+    const swipe = useSwipeControlStore.getState()
+    const jumpButton = useButtonStore.getState().buttons.jump
+    const descendButton = useButtonStore.getState().buttons.descend
+
+    if (keys.leftward || swipe.leftward) yawRef.current += GOD_YAW_SPEED * delta
+    if (keys.rightward || swipe.rightward) yawRef.current -= GOD_YAW_SPEED * delta
 
     let thrust = 0
-    if (keys.forward) thrust += 1
-    if (keys.backward) thrust -= 1
+    if (keys.forward || swipe.forward) thrust += 1
+    if (keys.backward || swipe.backward) thrust -= 1
 
     flightMoveDir.set(Math.sin(yawRef.current) * thrust, 0, Math.cos(yawRef.current) * thrust)
-    if (keys.jump) flightMoveDir.y += 1
-    if (keys.descend) flightMoveDir.y -= 1
+    if (keys.jump || jumpButton) flightMoveDir.y += 1
+    if (keys.descend || descendButton) flightMoveDir.y -= 1
     if (flightMoveDir.lengthSq() > 0) flightMoveDir.normalize()
 
     const speed = keys.run ? GOD_SPEED_FAST : GOD_SPEED
