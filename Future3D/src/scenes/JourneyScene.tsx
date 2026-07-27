@@ -6,7 +6,6 @@ import { SkyZone } from './SkyZone'
 import { EarthPlanet } from './EarthPlanet'
 import { Satellites } from './Satellites'
 import { CloudZone } from './CloudZone'
-import { GroundZone } from './GroundZone'
 import { Ufos } from './Ufos'
 import { SpaceTravelEffect } from './SpaceTravelEffect'
 import { FloatingClock } from './FloatingClock'
@@ -40,7 +39,6 @@ export function JourneyScene() {
       <EarthPlanet />
       <Satellites />
       <CloudZone />
-      <GroundZone />
       <Ufos />
       <SpaceTravelEffect />
       {/* Второй экземпляр — "эффект ускорения" на подлёте к Земле

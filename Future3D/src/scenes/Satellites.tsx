@@ -1,15 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import {
-  PLANET_CENTER,
-  PLANET_RADIUS,
-  FADE_OUT_START,
-  FADE_OUT_END,
-  REVEAL_FAR_DISTANCE,
-  REVEAL_NEAR_DISTANCE,
-} from './EarthPlanet'
-import { useScrollStore } from '@/utils/scrollStore'
+import { PLANET_CENTER, PLANET_RADIUS, REVEAL_FAR_DISTANCE, REVEAL_NEAR_DISTANCE } from './EarthPlanet'
 
 interface SatelliteConfig {
   orbitRadius: number
@@ -68,18 +60,16 @@ function Satellite({ orbitRadius, tilt, speed, phase }: SatelliteConfig) {
 }
 
 // Спутники на орбите вокруг настоящей Земли (EarthPlanet) — появляются
-// вместе с ней (тот же progress-диапазон видимости) и гаснут вместе с
-// ней при переходе в город.
+// вместе с ней (тот же диапазон видимости по дистанции) и остаются
+// видимыми до конца пути - Земля больше не гаснет (см. EarthPlanet.tsx).
 export function Satellites() {
   const fleet = useMemo(() => createFleet(), [])
   const groupRef = useRef<THREE.Group>(null!)
 
   useFrame((state) => {
-    const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
     const distance = state.camera.position.distanceTo(PLANET_CENTER)
     const fadeIn = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
-    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
-    groupRef.current.visible = fadeIn * fadeOut > 0.01
+    groupRef.current.visible = fadeIn > 0.01
   })
 
   return (

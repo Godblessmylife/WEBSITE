@@ -34,15 +34,18 @@ const MIN_RIGHT_LENGTH_SQ = 0.0025
 // чувствительным к исчезающе малым изменениям forward — камера
 // "срывает" горизонт на произвольный угол за один кадр (баг клиента:
 // "камера меняет горизонтальность" на конкретном проценте скролла).
-// Это не ошибка сглаживания и не лечится демпфированием — сама
-// математика lookAt вырождена ровно в этой точке для ЛЮБОГО пути с
-// таким перегибом. Фикс: тот же базис (right/up/forward), но right
-// пересчитывается, только пока горизонтальной составляющей forward
-// достаточно, чтобы направление было осмысленным; в вырожденной зоне
-// right остаётся прежним - камера просто перестаёт "довращивать" крен,
-// что незаметно на глаз (там и так почти нет горизонта, за который
-// можно было бы зацепиться взглядом), и не вращается на произвольный
-// угол.
+//
+// ПЕРВАЯ версия фикса замораживала right, пока его не с чем было
+// пересчитать. Это НЕ РАБОТАЕТ, если требуемый разворот - буквально
+// 180° (проверено расчётом: пока путь целиком лежал в плоскости x=0,
+// right = forward × worldUp был обязан лежать строго на оси X - между
+// +X и -X НЕТ промежуточного направления, значит ни заморозка, ни
+// плавный lerp не могут "довернуть" через этот участок - через x=0 это
+// математически невозможно). Реальный фикс - в cameraPath.ts (лёгкий
+// боковой увод пути на нужном участке, дающий right настоящую третью
+// размерность для поворота). Эта функция отвечает только за то, чтобы
+// поворот, который теперь СТАЛ возможным, происходил плавно во времени
+// (damping), а не мгновенно каждый кадр.
 //
 // ВАЖНО (проверено расчётом после того, как первая версия этой функции
 // полностью гасила видимость солнечной системы): right и up достаточно
@@ -52,18 +55,22 @@ const MIN_RIGHT_LENGTH_SQ = 0.0025
 // оно молча РАЗВОРАЧИВАЕТ right на 180°, ломая весь базис (проверено
 // численным сравнением с THREE.Matrix4.lookAt: с третьим произведением
 // расхождение было ровно 180°, без него - 0°).
-function applyStableLookAt(camera: THREE.Camera, from: THREE.Vector3, to: THREE.Vector3) {
+const ROT_DAMP_RATE = 2
+
+function applyStableLookAt(camera: THREE.Camera, from: THREE.Vector3, to: THREE.Vector3, delta: number) {
   forward.subVectors(to, from)
   if (forward.lengthSq() < 1e-8) return
   forward.normalize()
 
   candidateRight.crossVectors(forward, WORLD_UP)
   if (candidateRight.lengthSq() > MIN_RIGHT_LENGTH_SQ) {
-    rightVec.copy(candidateRight).normalize()
+    candidateRight.normalize()
+    const rotDamp = 1 - Math.exp(-ROT_DAMP_RATE * delta)
+    rightVec.lerp(candidateRight, rotDamp).normalize()
   }
-  // rightVec хранит последнее СТАБИЛЬНОЕ значение между кадрами (не
-  // пересоздаётся) - именно за счёт этого камера "замирает" по крену
-  // в вырожденной зоне, а не дёргается.
+  // Если candidateRight всё равно слишком мал (форвард почти точно
+  // вертикален) - rightVec просто не трогаем этот кадр, а не тянем к
+  // шумовому направлению.
   upVec.crossVectors(rightVec, forward).normalize()
   basisMatrix.makeBasis(rightVec, upVec, forward.clone().negate())
   camera.quaternion.setFromRotationMatrix(basisMatrix)
@@ -118,7 +125,7 @@ export function CameraRig() {
     } else {
       smoothedLookAtRef.current.lerp(finalLookAt, dampFactor)
     }
-    applyStableLookAt(state.camera, state.camera.position, smoothedLookAtRef.current)
+    applyStableLookAt(state.camera, state.camera.position, smoothedLookAtRef.current, delta)
   })
 
   return null

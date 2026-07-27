@@ -55,7 +55,7 @@ export function JourneyTuner() {
         from: progressToJourneyFraction(SKY_HOLD_END, scaleFactor),
         to: progressToJourneyFraction(CLOUD_HOLD_END, scaleFactor),
       },
-      { label: 'Земля и город', from: progressToJourneyFraction(CLOUD_HOLD_END, scaleFactor), to: 1 },
+      { label: 'Земля', from: progressToJourneyFraction(CLOUD_HOLD_END, scaleFactor), to: 1 },
     ],
     [scaleFactor],
   )

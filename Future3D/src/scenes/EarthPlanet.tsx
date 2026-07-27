@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { useScrollStore } from '@/utils/scrollStore'
 import earthModelUrl from '../models/earth.glb'
 
 // earth.glb — модель от клиента (Sketchfab), прогнанная через
@@ -14,23 +13,19 @@ import earthModelUrl from '../models/earth.glb'
 // коммитится (см. .gitignore).
 const MODEL_SOURCE_RADIUS = 100 // радиус сферы в исходной модели (bbox)
 
-// Земля теперь не гаснет на подлёте, а "перетекает" в город: центр
-// планеты подобран так, что финальная точка камеры (0, 1.6, 0) почти
-// касается её поверхности, поэтому весь конец спуска — это подлёт
-// вплотную к Земле (видна текстура крупным планом), а GroundZone
-// проявляется поверх неё в конце (см. FADE_OUT_START/END ниже и
-// зеркальный fade-in в GroundZone.tsx) — единое место, а не два
-// разных "низа".
+// БЫЛО: Земля гасла к концу пути и "перетекала" в отдельный
+// процедурный город (GroundZone) поверх неё. Убрано по просьбе клиента -
+// город на месте посадки был неубедителен (маленький расчищенный пятачок
+// у самой точки приземления почти никогда не попадал в кадр под нужным
+// углом, а вокруг нужно было либо ничего не видно, либо мешанина
+// зданий). Теперь весь финал пути (см. FINAL_DESCENT_REMAP_START /
+// MAX_DIVE_T в cameraPath.ts) - это буквально зум В планету: Земля
+// остаётся полностью непрозрачной и видимой до самого конца, только
+// приближается и растёт (см. SCALE_FAR/NEAR_DISTANCE ниже) - без
+// повторного затухания.
 export const PLANET_CENTER = new THREE.Vector3(0, -40, 20)
 export const PLANET_RADIUS = 45
 const MODEL_SCALE = PLANET_RADIUS / MODEL_SOURCE_RADIUS
-// БЫЛО 0.9-0.97 - выше реально достижимого максимума progress (~0.852,
-// пока страница видна, см. разбор в FogController.tsx) - Земля физически
-// не могла начать гаснуть ни при каком скролле. Синхронизировано с
-// GroundZone.tsx (FADE_IN_START/END там равны этим же числам) - Земля
-// гаснет ровно в темпе, в котором проявляется город поверх неё.
-export const FADE_OUT_START = 0.75
-export const FADE_OUT_END = 0.85
 
 // Раньше Земля появлялась по прогрессу скролла (0-0.05 — практически
 // мгновенно), пока камера была ещё в 80-100 юнитах от неё. На таком
@@ -106,12 +101,8 @@ export function EarthPlanet() {
   }, [scene])
 
   useFrame((state, delta) => {
-    const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
-
     const distance = state.camera.position.distanceTo(PLANET_CENTER)
-    const fadeIn = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
-    const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
-    const opacity = fadeIn * fadeOut
+    const opacity = 1 - THREE.MathUtils.smoothstep(distance, REVEAL_NEAR_DISTANCE, REVEAL_FAR_DISTANCE)
     const visible = opacity > 0.01
 
     const sizeFade = 1 - THREE.MathUtils.smoothstep(distance, SCALE_NEAR_DISTANCE, SCALE_FAR_DISTANCE)
