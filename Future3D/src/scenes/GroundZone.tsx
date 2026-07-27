@@ -115,7 +115,15 @@ function generateCity(thinOut: boolean): BuildingSpec[] {
   const buildings: BuildingSpec[] = []
   const half = 8
   const spacing = 7.5
-  const clearing = 10
+  // БЫЛО 10 - камера в конце подлёта (см. remapPathProgress в
+  // cameraPath.ts) останавливается на XZ ~(0, 7-9) и смотрит почти
+  // строго вниз (проверено расчётом угла - см. applyStableLookAt в
+  // CameraRig.tsx), то есть видит лишь небольшой пятачок земли прямо
+  // под собой. При старой просеке радиусом 10 этот пятачок целиком
+  // приходился на пустую зону - отсюда жалоба клиента "город которого
+  // нет". Уменьшенный радиус впускает здания в тот же пятачок, оставляя
+  // при этом место для самой точки приземления.
+  const clearing = 5
   const palette = ['#3a4a5c', '#2c3a48', '#465868', '#33424f', '#3f5163']
 
   for (let ix = -half; ix <= half; ix++) {

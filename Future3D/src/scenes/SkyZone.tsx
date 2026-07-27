@@ -1,6 +1,5 @@
 import { Stars } from '@react-three/drei'
 import { SolarSystemModel } from './SolarSystemModel'
-import { ShootingStars } from './ShootingStars'
 import { SOLAR_SYSTEM_TARGET, SOLAR_SYSTEM_SCALE } from './cameraPath'
 
 const ZONE_ORIGIN_Y = 50
@@ -24,7 +23,6 @@ export function SkyZone() {
       >
         <SolarSystemModel />
       </group>
-      <ShootingStars />
     </group>
   )
 }
