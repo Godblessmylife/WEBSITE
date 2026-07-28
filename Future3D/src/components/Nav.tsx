@@ -73,19 +73,21 @@ const navStyle: CSSProperties = {
   pointerEvents: 'none',
 }
 
+// По просьбе клиента кнопки сделаны прозрачнее (ниже alpha у фона) и
+// чуть компактнее (меньше padding/minHeight/шрифт), чем раньше.
 const navButtonBase: CSSProperties = {
   pointerEvents: 'auto',
   position: 'relative',
   fontFamily: "'Orbitron', sans-serif",
   fontWeight: 700,
-  fontSize: '0.78rem',
+  fontSize: '0.72rem',
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
   color: '#eafcff',
   border: '1px solid rgba(95, 212, 255, 0.5)',
   clipPath: CLIP,
-  padding: '0.85rem 1.6rem 0.85rem 1.5rem',
-  minHeight: '2.9rem',
+  padding: '0.65rem 1.35rem 0.65rem 1.25rem',
+  minHeight: '2.4rem',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -97,14 +99,14 @@ const navButtonBase: CSSProperties = {
 
 const navButtonStyle: CSSProperties = {
   ...navButtonBase,
-  background: 'linear-gradient(160deg, rgba(22, 34, 50, 0.85), rgba(8, 13, 22, 0.92))',
+  background: 'linear-gradient(160deg, rgba(22, 34, 50, 0.55), rgba(8, 13, 22, 0.6))',
   transform: 'perspective(600px) rotateX(0deg) translateY(0) translateZ(0)',
   boxShadow: '0 3px 0 rgba(95, 212, 255, 0.3), 0 8px 20px rgba(0, 0, 0, 0.45)',
 }
 
 const navButtonHoverStyle: CSSProperties = {
   ...navButtonBase,
-  background: 'linear-gradient(160deg, rgba(32, 52, 74, 0.92), rgba(10, 18, 30, 0.95))',
+  background: 'linear-gradient(160deg, rgba(32, 52, 74, 0.65), rgba(10, 18, 30, 0.7))',
   borderColor: 'rgba(95, 212, 255, 0.95)',
   transform: 'perspective(600px) rotateX(-9deg) translateY(-4px) translateZ(6px)',
   boxShadow:

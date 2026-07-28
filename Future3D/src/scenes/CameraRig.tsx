@@ -8,7 +8,10 @@ import {
   SOLAR_SYSTEM_TARGET,
   SOLAR_SYSTEM_LOOKAT_HOLD,
   SOLAR_SYSTEM_LOOKAT_END,
+  EARTH_LOOKAT_START_T,
+  EARTH_LOOKAT_FULL_T,
 } from './cameraPath'
+import { PLANET_CENTER } from './EarthPlanet'
 import { useScrollStore, maxReachableProgress } from '@/utils/scrollStore'
 
 const targetPosition = new THREE.Vector3()
@@ -104,7 +107,8 @@ export function CameraRig() {
     const lookProgress = THREE.MathUtils.clamp(progress + LOOK_AHEAD, 0, 1)
     const maxProgress = maxProgressRef.current
 
-    cameraPath.getPointAt(remapPathProgress(progress, maxProgress), targetPosition)
+    const pathT = remapPathProgress(progress, maxProgress)
+    cameraPath.getPointAt(pathT, targetPosition)
     cameraPath.getPointAt(remapPathProgress(lookProgress, maxProgress), lookAtPosition)
 
     const dampFactor = 1 - Math.exp(-3 * delta)
@@ -118,7 +122,14 @@ export function CameraRig() {
     // до HOLD, затем плавно отпускается к обычной логике "смотреть по
     // направлению движения" к моменту END.
     const solarBlend = 1 - THREE.MathUtils.smoothstep(progress, SOLAR_SYSTEM_LOOKAT_HOLD, SOLAR_SYSTEM_LOOKAT_END)
-    finalLookAt.copy(lookAtPosition).lerp(SOLAR_SYSTEM_TARGET, solarBlend)
+    // Тот же приём на подлёте к Земле (см. EARTH_LOOKAT_START_T в
+    // cameraPath.ts) — без него взгляд идёт по касательной пути, которая
+    // на этом отрезке уводит камеру в сторону +X (обход вырождения
+    // "право" камеры), и Земля (всегда строго на x=0) визуально уезжает
+    // вправо. По t КРИВОЙ (pathT), а не по progress — расхождение прибито
+    // к конкретному участку геометрии пути, а не к проценту скролла.
+    const earthBlend = THREE.MathUtils.smoothstep(pathT, EARTH_LOOKAT_START_T, EARTH_LOOKAT_FULL_T)
+    finalLookAt.copy(lookAtPosition).lerp(SOLAR_SYSTEM_TARGET, solarBlend).lerp(PLANET_CENTER, earthBlend)
 
     if (!smoothedLookAtRef.current) {
       smoothedLookAtRef.current = finalLookAt.clone()
