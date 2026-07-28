@@ -16,6 +16,7 @@ import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { JourneyTuner } from '@/components/JourneyTuner'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
+import { JourneyTaglines } from '@/components/JourneyTaglines'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
@@ -45,6 +46,7 @@ export function App() {
         <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
           <JourneyScene />
           <StratosphereFlash />
+          <JourneyTaglines />
         </div>
       </div>
 
