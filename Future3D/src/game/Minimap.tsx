@@ -43,12 +43,13 @@ const STATIC_MARKERS: { type: MarkerType; x: number; z: number; label: string }[
   { type: 'shop', x: 30, z: -25, label: 'Лавка' },
   { type: 'shop', x: -22, z: -28, label: 'Ракета' },
   { type: 'shop', x: 20, z: 20, label: 'Компьютер' },
-  { type: 'decor', x: -60, z: 40, label: 'Зона отдыха' },
-  { type: 'decor', x: -70, z: -40, label: 'NPC2' },
+  { type: 'decor', x: -48, z: 32, label: 'Зона отдыха' },
+  { type: 'decor', x: -55, z: -30, label: 'NPC2' },
   { type: 'decor', x: 60, z: -50, label: 'Автомат' },
   { type: 'decor', x: 60, z: -30, label: 'Автомат 2' },
   { type: 'mountain', x: 85, z: 70, label: 'Гора' },
-  { type: 'decor', x: -12, z: 4, label: 'Машины' },
+  { type: 'decor', x: -14, z: 6, label: 'Машины' },
+  { type: 'decor', x: 22, z: -14, label: 'Остров' },
 ]
 
 const NPC_MARKER = { x: 2, z: 4 }

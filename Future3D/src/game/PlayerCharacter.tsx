@@ -7,6 +7,7 @@ import { useButtonStore } from 'ecctrl/input'
 import { useCustomGravity } from 'ecctrl/gravity'
 import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
+import { useDriveStore } from '@/utils/driveStore'
 import { useSwipeControlStore } from '@/utils/swipeControlStore'
 import heroModelUrl from '../models/hero.glb'
 
@@ -50,6 +51,7 @@ const yawEuler = new THREE.Euler()
 
 export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const { scene } = useGLTF(heroModelUrl)
+  const isDriving = useDriveStore((s) => !!s.drivingId)
   const tiltRef = useRef<THREE.Group>(null!)
   const bobPhaseRef = useRef(0)
   const yawRef = useRef(0)
@@ -74,17 +76,22 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     if (!handle) return
 
     const godMode = useGodModeStore.getState().active
+    // За рулём машины (CarDriving.tsx) - персонаж стоит на месте и
+    // спрятан (см. return ниже, visible={!isDriving} на группе с моделью),
+    // движение полностью отдано CarDriving.tsx. То же "все клавиши
+    // отпущены", что и в God Mode - без этого ecctrl продолжал бы пытаться
+    // ходить телом, которое в этот момент невидимо стоит внутри машины.
+    const isDriving = !!useDriveStore.getState().drivingId
     const keys = getKeys()
     const swipe = useSwipeControlStore.getState()
     const jumpButton = useButtonStore.getState().buttons.jump
 
-    // В God Mode Ecctrl не должен пытаться сам ходить/прыгать/поворачивать
-    // персонажа обычным способом (ниже это делает отдельный useFrame с
-    // приоритетом) — передаём ему "все клавиши отпущены", а не читаем
-    // свайп/jump, иначе ходьба и полёт будут пытаться управлять телом
-    // одновременно.
+    // В God Mode/за рулём Ecctrl не должен пытаться сам ходить/прыгать/
+    // поворачивать персонажа обычным способом — передаём ему "все клавиши
+    // отпущены", а не читаем свайп/jump, иначе несколько систем управления
+    // телом будут конкурировать одновременно.
     handle.setMovement(
-      godMode
+      godMode || isDriving
         ? EMPTY_MOVEMENT
         : {
             forward: keys.forward || swipe.forward,
@@ -97,9 +104,8 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
           },
     )
 
-    if (godMode) {
-      // Процедурная походка ниже — только для ходьбы по земле, во время
-      // полёта персонаж управляется вторым useFrame ниже.
+    if (godMode || isDriving) {
+      // Процедурная походка ниже — только для обычной ходьбы по земле.
       return
     }
 
@@ -213,7 +219,7 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       maxRunVel={9}
       enableCustomGravity
     >
-      <group ref={tiltRef}>
+      <group ref={tiltRef} visible={!isDriving}>
         <primitive object={scene} position={[0, MODEL_Y_OFFSET, 0]} />
       </group>
     </Ecctrl>

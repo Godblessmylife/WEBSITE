@@ -1,5 +1,6 @@
 import { useGLTF } from '@react-three/drei'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { Grabbable } from './Grabbable'
 import minishopUrl from '../models/minishop.glb'
 import shopUrl from '../models/shop.glb'
 import rocketUrl from '../models/rocket.glb'
@@ -11,6 +12,7 @@ import slot2Url from '../models/slot2.glb'
 import ostrovokUrl from '../models/ostrovok.glb'
 import car1Url from '../models/Car1.glb'
 import car2Url from '../models/car2.glb'
+import ostrovUrl from '../models/ostrov.glb'
 
 // Коллайдеры — ЯВНЫЕ CuboidCollider с размерами/центром, посчитанными из
 // реального bbox моделей (gltf-transform inspect), а НЕ colliders="cuboid"
@@ -29,14 +31,28 @@ import car2Url from '../models/car2.glb'
 // физика гарантированно совпадают независимо от того, как именно
 // библиотека обрабатывает вложенный scale.
 
+// Grabbable оборачивает объекты в "режим разработчика" (кнопка CRAFT в
+// GameMode.tsx, см. Grabbable.tsx/craftStore.ts) - клик по объекту в
+// этом режиме "берёт" его, следующий клик ставит на новое место (X/Z по
+// курсору, высота не трогается). Rocket/SlotMachine/SlotMachine2 НЕ
+// сделаны берущимися намеренно - их мировые координаты продублированы в
+// QuestObjectiveRocket.tsx/QuestObjectiveChip.tsx/Minimap.tsx, и перенос
+// в рантайме рассинхронизировал бы квесты с картой без отдельного
+// механизма синхронизации, которого пока нет.
+
 function Minishop() {
   const { scene } = useGLTF(minishopUrl)
   // bbox: (-10.23,-0.122,-5.49) .. (8.387,14.202,6.313), scale=1
   return (
-    <RigidBody type="fixed" colliders={false} position={[-28, 0.122, 18]}>
+    <Grabbable
+      id="minishop"
+      defaultPosition={[-28, 0.122, 18]}
+      hitboxSize={[18.62, 14.32, 11.8]}
+      hitboxCenter={[-0.92, 7.04, 0.41]}
+    >
       <CuboidCollider args={[9.31, 7.16, 5.9]} position={[-0.92, 7.04, 0.41]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -47,10 +63,15 @@ function Shop() {
   // заметно больше minishop (~22 юнита высотой против ~14.3).
   const SCALE = 150
   return (
-    <RigidBody type="fixed" colliders={false} position={[30, 0.1335, -25]}>
+    <Grabbable
+      id="shop"
+      defaultPosition={[30, 0.1335, -25]}
+      hitboxSize={[23.14, 22.02, 26.18]}
+      hitboxCenter={[2.14, 11.15, 0.08]}
+    >
       <CuboidCollider args={[11.57, 11.01, 13.09]} position={[2.14, 11.15, 0.08]} />
       <primitive object={scene} scale={SCALE} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -77,24 +98,38 @@ const COMPUTER_BIG_SCALE = 2.2
 function ComputerBig() {
   const { scene } = useGLTF(computerBigUrl)
   return (
-    <RigidBody type="fixed" colliders={false} position={COMPUTER_BIG_POSITION}>
+    <Grabbable
+      id="computerBig"
+      defaultPosition={COMPUTER_BIG_POSITION}
+      hitboxSize={[1.08 * COMPUTER_BIG_SCALE, 0.56 * COMPUTER_BIG_SCALE, 0.48 * COMPUTER_BIG_SCALE]}
+      hitboxCenter={[0, 0.28 * COMPUTER_BIG_SCALE, 0.03 * COMPUTER_BIG_SCALE]}
+    >
       <CuboidCollider
         args={[0.54 * COMPUTER_BIG_SCALE, 0.28 * COMPUTER_BIG_SCALE, 0.24 * COMPUTER_BIG_SCALE]}
         position={[0, 0.28 * COMPUTER_BIG_SCALE, 0.03 * COMPUTER_BIG_SCALE]}
       />
       <primitive object={scene} scale={COMPUTER_BIG_SCALE} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
 function ChillZone() {
   const { scene } = useGLTF(chillZoneUrl)
   // bbox: (-9.47,-0.199,-8.04) .. (8.135,3.432,9.867), scale=1
+  // Было (-60,40) - клиент попросил "распределить объекты ближе к
+  // телепорту" (10,0,-10). Подтянуто к (-48,32) - вручную проверено по
+  // AABB против соседних построек (Minishop: (-28,18), half-extent
+  // 9.31x5.9), чтобы не пересечься с ней.
   return (
-    <RigidBody type="fixed" colliders={false} position={[-60, 0.199, 40]}>
+    <Grabbable
+      id="chillZone"
+      defaultPosition={[-48, 0.199, 32]}
+      hitboxSize={[17.6, 3.64, 17.9]}
+      hitboxCenter={[-0.67, 1.62, 0.91]}
+    >
       <CuboidCollider args={[8.8, 1.82, 8.95]} position={[-0.67, 1.62, 0.91]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -112,11 +147,19 @@ function Npc2Decor() {
   // персонаж как npc1, а декоративная сцена/группа — используется как
   // декорация, а не как второй диалоговый NPC. Если задумывалось иначе —
   // легко поменять.
+  // Было (-70,-40) - подтянуто к (-55,-30) той же просьбой клиента
+  // "ближе к телепорту", проверено по AABB против Rocket ((-22,-28),
+  // half-extent 4.29x3.03) и новой позиции ChillZone выше - пересечений нет.
   return (
-    <RigidBody type="fixed" colliders={false} position={[-70, 1.198, -40]}>
+    <Grabbable
+      id="npc2Decor"
+      defaultPosition={[-55, 1.198, -30]}
+      hitboxSize={[20.24, 2.7, 15.32]}
+      hitboxCenter={[0, 0.16, 1.54]}
+    >
       <CuboidCollider args={[10.12, 1.35, 7.66]} position={[0, 0.16, 1.54]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -155,10 +198,15 @@ function Mountain() {
   // который обходят, а не взбираются на него, как и остальные постройки
   // на карте.
   return (
-    <RigidBody type="fixed" colliders={false} position={[85, 2.854, 70]}>
+    <Grabbable
+      id="mountain"
+      defaultPosition={[85, 2.854, 70]}
+      hitboxSize={[91.94, 10.26, 91.94]}
+      hitboxCenter={[-1.98, 2.27, -11.18]}
+    >
       <CuboidCollider args={[45.97, 5.13, 45.97]} position={[-1.98, 2.27, -11.18]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -167,25 +215,92 @@ function Mountain() {
 // PlayerCharacter.tsx), но в стороне от пальм/бонусов/странника у спавна
 // (см. PALM_POSITIONS в GameWorld.tsx и BONUS_POSITIONS в Bonuses.tsx) -
 // на западе, где рядом со спавном ничего больше не стоит.
+//
+// ВТОРАЯ итерация: клиент — "они очень маленькие, сделать большими и
+// чуть отодвинуть от телепорта". При scale=1 Car1 (~4.6м длиной) на самом
+// деле почти реалистичного размера - но реалистичный размер ТЕРЯЕТСЯ на
+// фоне намеренно преувеличенного масштаба всего остального на этой карте
+// (SlotMachine - ~24м высотой, Shop масштабирован в 150 раз) - отсюда
+// "маленькие" не в абсолюте, а по контрасту. CAR_SCALE=3 приводит машины
+// к тому же "преувеличенному" языку карты. Позиции раздвинуты и повёрнуты
+// друг к другу перпендикулярно (Car1 длинная по X, Car2 - по Z, см. их
+// bbox) - при увеличенных габаритах старые соседние координаты пересекли
+// бы друг друга, если оставить как было.
+const CAR_SCALE = 3
+
 function Car1Model() {
   const { scene } = useGLTF(car1Url)
-  // bbox: (-2.341,-0.016,-0.976) .. (2.235,1.043,0.976)
+  // bbox: (-2.341,-0.016,-0.976) .. (2.235,1.043,0.976), при CAR_SCALE=3
+  // половины сторон/центр коллайдера домножены на тот же коэффициент.
   return (
-    <RigidBody type="fixed" colliders={false} position={[-11, 0.01595, 2]}>
-      <CuboidCollider args={[2.288, 0.529, 0.976]} position={[-0.026, 0.513, 0]} />
-      <primitive object={scene} />
-    </RigidBody>
+    <Grabbable
+      id="car1"
+      defaultPosition={[-20, 0.0479, 0]}
+      hitboxSize={[13.728, 3.174, 5.856]}
+      hitboxCenter={[-0.078, 1.539, 0]}
+    >
+      <CuboidCollider args={[6.864, 1.587, 2.928]} position={[-0.078, 1.539, 0]} />
+      <primitive object={scene} scale={CAR_SCALE} />
+    </Grabbable>
   )
 }
 
 function Car2Model() {
   const { scene } = useGLTF(car2Url)
-  // bbox: (-0.597,-0.004,-1.356) .. (0.597,0.849,1.396)
+  // bbox: (-0.597,-0.004,-1.356) .. (0.597,0.849,1.396), при CAR_SCALE=3
+  // половины сторон/центр коллайдера домножены на тот же коэффициент.
   return (
-    <RigidBody type="fixed" colliders={false} position={[-13, 0.00434, 6.5]}>
-      <CuboidCollider args={[0.597, 0.427, 1.376]} position={[0, 0.427, 0.02]} />
-      <primitive object={scene} />
-    </RigidBody>
+    <Grabbable
+      id="car2"
+      defaultPosition={[-8, 0.013, 12]}
+      hitboxSize={[3.582, 2.562, 8.256]}
+      hitboxCenter={[0, 1.281, 0.06]}
+    >
+      <CuboidCollider args={[1.791, 1.281, 4.128]} position={[0, 1.281, 0.06]} />
+      <primitive object={scene} scale={CAR_SCALE} />
+    </Grabbable>
+  )
+}
+
+// "Объект с водой" - ostrov.glb, присланная клиентом модель острова,
+// которая раньше НИ РАЗУ не использовалась на карте (в отличие от
+// ostrovok.glb выше, ставшего "горой") - найдена простым поиском по
+// всем моделям в src/models/, ничего похожего на "воду" в уже
+// подключённых постройках нет. Исходный bbox огромный (~36406 условных
+// единиц по каждой оси, тот же самый "остров в масштабе ~18000", что
+// упоминается в истории GroundZone.tsx - там от него отказались для
+// ЛЕНДИНГА из-за нестыковки с плоской землёй, но для игровой карты,
+// где сам остров стоит на собственном коллайдере, это не проблема).
+//
+// ВАЖНО: исходник — 180 003 вершины (gltf-transform inspect), на
+// порядок больше любого другого объекта на карте - в игре с тенями
+// (GameMode.tsx: shadows={!reduced}) это одна такая модель почти
+// полностью убивала fps (проверено: 1 fps вместо ~60 сразу после
+// добавления, до этого не встречалось ни на одном другом объекте).
+// Пересжато gltf-transform с явно ослабленным --simplify-error (дефолт
+// 0.0001 почти не трогал геометрию) до 14 364 вершин (-92%) - на
+// экранном размере ~20 юниц (ISLAND_SCALE ниже) разница в силуэте не
+// заметна, а fps возвращается к норме. Исходный файл (180k вершин) —
+// ostrov.source.glb, не коммитится.
+// ISLAND_SCALE подобран так, чтобы результат был ~20 юнитов в диаметре -
+// заметный, но не подавляющий соседние постройки ориентир, поставлен
+// рядом с порталом (DESERT_PORTAL_POSITION=(10,0,-10) в GameMode.tsx) -
+// по просьбе клиента "объект с водой - ближе к телепорту".
+const ISLAND_SCALE = 0.00055
+
+function Island() {
+  const { scene } = useGLTF(ostrovUrl)
+  // bbox после упрощения: (-17853.7,-18237.2,-17853.3)..(18203.5,18424.2,17510.2)
+  return (
+    <Grabbable
+      id="island"
+      defaultPosition={[22, 10.0305, -14]}
+      hitboxSize={[19.832, 20.164, 19.45]}
+      hitboxCenter={[0.096, 0.051, -0.094]}
+    >
+      <CuboidCollider args={[9.916, 10.082, 9.725]} position={[0.096, 0.051, -0.094]} />
+      <primitive object={scene} scale={ISLAND_SCALE} />
+    </Grabbable>
   )
 }
 
@@ -207,6 +322,7 @@ export function MapProps() {
       <Mountain />
       <Car1Model />
       <Car2Model />
+      <Island />
     </>
   )
 }
@@ -222,3 +338,4 @@ useGLTF.preload(slot2Url)
 useGLTF.preload(ostrovokUrl)
 useGLTF.preload(car1Url)
 useGLTF.preload(car2Url)
+useGLTF.preload(ostrovUrl)

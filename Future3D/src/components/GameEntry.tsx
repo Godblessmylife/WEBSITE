@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
@@ -122,6 +123,76 @@ function Computer() {
   return <primitive object={scene} scale={COMPUTER_SCALE} />
 }
 
+// Подсказки "зажми и поверни" / "зум" — по просьбе клиента: раньше
+// ничто на экране не намекало, что компьютер вообще можно вращать/
+// зумить (OrbitControls есть, но невидим глазу) - обычные DOM-бейджи
+// по бокам от объекта, а не часть 3D-сцены (проще уложить в макет
+// точным текстом/иконкой, не завязываясь на 3D-текст). pointerEvents:
+// 'none' — чисто информационные, не должны перехватывать drag/зум
+// у OrbitControls под ними.
+function RotateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#5fd4ff" strokeWidth="2" strokeLinecap="round">
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4" />
+      <path d="M3.5 3.8v5h5" />
+    </svg>
+  )
+}
+
+function ZoomIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#5fd4ff" strokeWidth="2" strokeLinecap="round">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <line x1="20" y1="20" x2="15.4" y2="15.4" />
+      <line x1="7.5" y1="10.5" x2="13.5" y2="10.5" />
+      <line x1="10.5" y1="7.5" x2="10.5" y2="13.5" />
+    </svg>
+  )
+}
+
+const hintBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.5rem 1rem',
+  background: 'rgba(10, 17, 32, 0.7)',
+  border: '1px solid rgba(95, 212, 255, 0.5)',
+  borderRadius: '999px',
+  color: '#eafcff',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: '0.75rem',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+  animation: 'game-entry-hint-pulse 2.4s ease-in-out infinite',
+}
+
+function InteractionHints() {
+  return (
+    <>
+      <div style={{ ...hintBadgeStyle, left: '6%', top: '48%', transform: 'translateY(-50%)' }}>
+        Зажми
+      </div>
+      <div style={{ ...hintBadgeStyle, right: '6%', top: '48%', transform: 'translateY(-50%)', animationDelay: '0.4s' }}>
+        <RotateIcon />
+        Поверни · 360°
+      </div>
+      <div style={{ ...hintBadgeStyle, right: '6%', top: 'calc(48% + 3rem)', animationDelay: '0.8s' }}>
+        <ZoomIcon />
+        Приблизь
+      </div>
+      <style>{`
+        @keyframes game-entry-hint-pulse {
+          0%, 100% { opacity: 0.55; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+    </>
+  )
+}
+
 // Секция после карусели портфолио: компьютер + висящая надпись START.
 // Клик по надписи включает isGameActive (см. utils/gameStore.ts) —
 // App.tsx монтирует поверх всего GameMode, когда флаг включён.
@@ -175,6 +246,7 @@ export function GameEntry() {
           />
         </Canvas>
       )}
+      {!isGameActive && <InteractionHints />}
     </section>
   )
 }

@@ -8,6 +8,7 @@ import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { useGameStore } from '@/utils/gameStore'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -52,7 +53,15 @@ function Card({ index }: { index: number }) {
   )
 }
 
-function Carousel({ dragRef, rotationRef }: { dragRef: RefObject<DragState>; rotationRef: RefObject<number> }) {
+function Carousel({
+  dragRef,
+  rotationRef,
+  scale,
+}: {
+  dragRef: RefObject<DragState>
+  rotationRef: RefObject<number>
+  scale: number
+}) {
   const groupRef = useRef<THREE.Group>(null!)
 
   useFrame((_, delta) => {
@@ -63,7 +72,7 @@ function Carousel({ dragRef, rotationRef }: { dragRef: RefObject<DragState>; rot
   })
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} scale={scale}>
       {THEMES.map((_, i) => (
         <Card key={i} index={i} />
       ))}
@@ -80,6 +89,7 @@ export function PortfolioCarousel() {
   // Не размонтировался, пока идёт игра - лишний живой WebGL-контекст на
   // мобильном (см. подробности в JourneyScene.tsx).
   const isGameActive = useGameStore((s) => s.isGameActive)
+  const isMobile = useIsMobileViewport()
   const dragRef = useRef<DragState>({ active: false, lastX: 0, velocity: 0.15 })
   const rotationRef = useRef(0)
 
@@ -111,7 +121,16 @@ export function PortfolioCarousel() {
     >
       <Canvas
         camera={{ position: [0, 1.4, 8.5], fov: 50 }}
-        style={{ touchAction: 'none', cursor: 'grab' }}
+        // БЫЛО touchAction:'none' - блокировало ЛЮБОЙ дефолтный тач-жест
+        // на канвасе, включая обычный вертикальный скролл страницы: по
+        // жалобе клиента "перейдя на эту вкладку дальше прокрутка
+        // ломается" - т.к. канвас растянут на весь экран (100vh), палец
+        // почти гарантированно стартует на нём. 'pan-y' оставляет
+        // браузеру дефолтную вертикальную прокрутку, а горизонтальный
+        // drag-поворот карусели по-прежнему ловится через onPointerMove
+        // (это JS-обработчики, не зависят от touchAction - он влияет
+        // только на встроенные жесты браузера).
+        style={{ touchAction: 'pan-y', cursor: 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -124,7 +143,10 @@ export function PortfolioCarousel() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
         <Environment files={cityHdri} />
-        <Carousel dragRef={dragRef} rotationRef={rotationRef} />
+        {/* Компактнее на мобильном по просьбе клиента - масштаб самой
+            карусели уменьшен, камера не трогается (проще и меньше риска
+            промахнуться мимо кадра, чем пересчитывать позицию/fov). */}
+        <Carousel dragRef={dragRef} rotationRef={rotationRef} scale={isMobile ? 0.72 : 1} />
       </Canvas>
     </section>
   )

@@ -8,6 +8,9 @@ import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
 import { useGodModeStore } from '@/utils/godModeStore'
+import { useCraftStore } from '@/utils/craftStore'
+import { CraftModeController } from './CraftModeController'
+import { CraftGhost } from './CraftGhost'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
@@ -27,6 +30,8 @@ import { SpaceZone, SPACE_TELEPORT_TARGET, SPACE_RETURN_PORTAL_POSITION } from '
 import { SwipeControls } from './SwipeControls'
 import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
+import { CarEntryTrigger, DrivingCar, performCarInteraction } from './CarDriving'
+import { useDriveStore } from '@/utils/driveStore'
 
 const DESERT_PORTAL_POSITION = new THREE.Vector3(10, 0, -10)
 // Совпадает со стартовой позицией персонажа в PlayerCharacter.tsx
@@ -45,6 +50,11 @@ const KEYBOARD_MAP = [
   // Только для God Mode (спуск при полёте) - в обычном режиме ничего не
   // делает, PlayerCharacter.tsx читает это поле только пока godMode активен.
   { name: 'descend', keys: ['ControlLeft', 'KeyC'] },
+  // Сесть/выйти из машины (CarDriving.tsx) - по просьбе клиента именно
+  // ENTER, не отдельная кнопка на экране (десктопный сценарий; на
+  // телефоне подойти вплотную к машине и коснуться экрана — тач-события
+  // на клавиатуру не влияют, а расстояние проверяется отдельно).
+  { name: 'interact', keys: ['Enter'] },
 ]
 
 // Полноэкранный оверлей мини-игры: физический мир (Rapier) + персонаж
@@ -59,6 +69,10 @@ export function GameMode() {
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
   const godModeActive = useGodModeStore((s) => s.active)
   const toggleGodMode = useGodModeStore((s) => s.toggle)
+  const craftActive = useCraftStore((s) => s.active)
+  const toggleCraft = useCraftStore((s) => s.toggle)
+  const drivingId = useDriveStore((s) => s.drivingId)
+  const nearCarId = useDriveStore((s) => s.nearCarId)
   const isMobile = useIsMobileViewport()
 
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
@@ -113,6 +127,9 @@ export function GameMode() {
           <Physics gravity={[0, 0, 0]}>
             <KeyboardControls map={KEYBOARD_MAP}>
               <PlayerCharacter ecctrlRef={ecctrlRef} />
+              <CarEntryTrigger id="car1" ecctrlRef={ecctrlRef} />
+              <CarEntryTrigger id="car2" ecctrlRef={ecctrlRef} />
+              <DrivingCar />
             </KeyboardControls>
             <GameWorld />
             <Bonuses ecctrlRef={ecctrlRef} />
@@ -133,6 +150,11 @@ export function GameMode() {
         <GameCamera ecctrlRef={ecctrlRef} />
         <GameDebugTracker ecctrlRef={ecctrlRef} />
         <MinimapTracker ecctrlRef={ecctrlRef} />
+        {/* Режим разработчика (кнопка CRAFT ниже) - контроллер бросает
+            луч из курсора на землю каждый кадр (craftStore.ts), призрак -
+            полупрозрачный превью места установки, пока что-то в руках. */}
+        <CraftModeController />
+        <CraftGhost />
       </Canvas>
 
       <div
@@ -203,6 +225,57 @@ export function GameMode() {
         God Mode
       </button>
 
+      {/* "Режим разработчика" - как в Майнкрафте, объекты карты можно
+          взять кликом и переставить (Grabbable.tsx/craftStore.ts). По
+          центру верхней панели - единственное свободное место среди уже
+          занятых углов (счёт/квесты слева, God Mode/Выход справа). */}
+      <button
+        onClick={toggleCraft}
+        style={{
+          position: 'absolute',
+          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: btnPadding,
+          minHeight: btnMinHeight,
+          background: craftActive ? 'rgba(95, 212, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
+          border: '1px solid rgba(95, 212, 255, 0.8)',
+          borderRadius: '999px',
+          color: craftActive ? '#04121c' : '#c8ecff',
+          fontFamily: "'Orbitron', sans-serif",
+          fontSize: btnFontSize,
+          fontWeight: craftActive ? 700 : 400,
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          zIndex: 1001,
+        }}
+      >
+        CRAFT
+      </button>
+      {craftActive && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `calc(${edgeInset} + ${btnMinHeight} + 0.6rem + env(safe-area-inset-top))`,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '0.4rem 0.9rem',
+            background: 'rgba(10, 17, 32, 0.7)',
+            border: '1px solid rgba(95, 212, 255, 0.4)',
+            borderRadius: '999px',
+            color: '#c8ecff',
+            fontFamily: "'Orbitron', sans-serif",
+            fontSize: '0.65rem',
+            letterSpacing: '0.04em',
+            whiteSpace: 'nowrap',
+            zIndex: 1001,
+            pointerEvents: 'none',
+          }}
+        >
+          Клик по объекту — взять, ещё клик — поставить
+        </div>
+      )}
+
       <button
         onClick={() => setGameActive(false)}
         style={{
@@ -271,6 +344,36 @@ export function GameMode() {
             top: 'auto',
           }}
         />
+      )}
+
+      {/* Сесть/выйти из машины - ENTER на клавиатуре уже работает
+          (KEYBOARD_MAP выше), но на телефоне физической клавиатуры нет,
+          поэтому нужен видимый триггер того же действия. Показывается
+          только когда есть что сделать - рядом с машиной или уже за рулём. */}
+      {(nearCarId || drivingId) && (
+        <button
+          onClick={() => performCarInteraction((drivingId ?? nearCarId)!, ecctrlRef)}
+          style={{
+            position: 'absolute',
+            bottom: `calc(${edgeInset} + 5rem + env(safe-area-inset-bottom))`,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: btnPadding,
+            minHeight: btnMinHeight,
+            background: 'rgba(95, 212, 255, 0.85)',
+            border: '1px solid #eafcff',
+            borderRadius: '999px',
+            color: '#04121c',
+            fontFamily: "'Orbitron', sans-serif",
+            fontWeight: 700,
+            fontSize: btnFontSize,
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            zIndex: 1001,
+          }}
+        >
+          {drivingId ? 'Выйти (ENTER)' : 'Сесть (ENTER)'}
+        </button>
       )}
 
       {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована

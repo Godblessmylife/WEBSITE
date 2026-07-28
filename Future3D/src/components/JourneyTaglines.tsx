@@ -36,12 +36,23 @@ const PHRASES: Phrase[] = [
 // Ширина плавного появления/исчезновения вокруг центра фразы (в
 // progress) - при разнице между соседними фразами (21/44/62/84% jf, то
 // есть минимум ~18% jf) с запасом не пересекается со следующей.
-const HALF_WIDTH = 0.045
+// TYPE_WIDTH - первая половина окна тратится на "печать" по буквам,
+// DISSOLVE_WIDTH - вторая половина на растворение (см. useFrame-подобный
+// subscribe ниже) - по отдельной жалобе клиента "почти не видно и пусть
+// появляется как печатная машинка, с растворением" - раньше это был
+// один общий smoothstep-fade на всё окно сразу, без печати по буквам и
+// без отдельного эффекта на исчезновение.
+const TYPE_WIDTH = 0.045
+const DISSOLVE_WIDTH = 0.05
 
-function intensityAt(progress: number, center: number): number {
-  const fadeIn = THREE.MathUtils.smoothstep(progress, center - HALF_WIDTH, center)
-  const fadeOut = 1 - THREE.MathUtils.smoothstep(progress, center, center + HALF_WIDTH)
-  return Math.min(fadeIn, fadeOut)
+function splitReveal(phrase: Phrase, fraction: number): { big: string; text: string } {
+  const bigLen = phrase.big?.length ?? 0
+  const totalLen = bigLen + phrase.text.length
+  const revealCount = Math.round(THREE.MathUtils.clamp(fraction, 0, 1) * totalLen)
+  return {
+    big: phrase.big ? phrase.big.slice(0, Math.min(revealCount, bigLen)) : '',
+    text: phrase.text.slice(0, Math.max(0, revealCount - bigLen)),
+  }
 }
 
 const wrapperStyle: CSSProperties = {
@@ -64,19 +75,61 @@ const phraseStyle: CSSProperties = {
   // системный шрифт, без новой зависимости ради одного акцента).
   fontFamily: '"Courier New", monospace',
   color: '#eafcff',
-  textShadow: '0 0 24px rgba(95, 212, 255, 0.55), 0 0 48px rgba(95, 212, 255, 0.25)',
+  textShadow: '0 0 30px rgba(95, 212, 255, 0.6), 0 0 60px rgba(95, 212, 255, 0.3)',
   letterSpacing: '0.06em',
+  willChange: 'opacity, filter',
+}
+
+// Размер увеличен по прямой просьбе клиента ("почти не видно, увеличить
+// в разы") - было clamp(2.6rem,8vw,5rem)/clamp(1.3rem,3.4vw,2.2rem),
+// теперь текст занимает заметную часть экрана по ширине, как настоящий
+// герой-заголовок, а не мелкая подпись поверх сцены.
+const bigLineStyle: CSSProperties = { fontSize: 'clamp(5rem, 16vw, 11rem)', fontWeight: 700, lineHeight: 1.05 }
+const textLineStyle: CSSProperties = {
+  fontSize: 'clamp(2.2rem, 7vw, 5rem)',
+  fontWeight: 700,
+  lineHeight: 1.2,
+  textTransform: 'uppercase',
 }
 
 export function JourneyTaglines() {
-  const refs = useRef<(HTMLDivElement | null)[]>([])
+  const wrapperRefs = useRef<(HTMLDivElement | null)[]>([])
+  const bigRefs = useRef<(HTMLDivElement | null)[]>([])
+  const textRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     const unsub = useScrollStore.subscribe((state) => {
       const progress = THREE.MathUtils.clamp(state.progress, 0, 1)
       PHRASES.forEach((phrase, i) => {
-        const el = refs.current[i]
-        if (el) el.style.opacity = String(intensityAt(progress, phrase.centerProgress))
+        const wrapperEl = wrapperRefs.current[i]
+        const bigEl = bigRefs.current[i]
+        const textEl = textRefs.current[i]
+        if (!wrapperEl) return
+
+        const typeStart = phrase.centerProgress - TYPE_WIDTH
+        const typeFraction = THREE.MathUtils.smoothstep(progress, typeStart, phrase.centerProgress)
+        const dissolveFraction = THREE.MathUtils.smoothstep(
+          progress,
+          phrase.centerProgress,
+          phrase.centerProgress + DISSOLVE_WIDTH,
+        )
+
+        if (typeFraction <= 0) {
+          wrapperEl.style.opacity = '0'
+          return
+        }
+
+        const revealed = splitReveal(phrase, typeFraction)
+        const stillTyping = typeFraction < 1 && dissolveFraction <= 0
+        if (bigEl) bigEl.textContent = revealed.big + (stillTyping && revealed.text === '' ? '▌' : '')
+        if (textEl) textEl.textContent = revealed.text + (stillTyping && revealed.text !== '' ? '▌' : '')
+
+        // "Печатная машинка" - буквы появляются одна за другой, весь блок
+        // сразу непрозрачен, пока идёт печать. "Растворение" - отдельная
+        // фаза ПОСЛЕ центра: полностью напечатанный текст гаснет через
+        // opacity+blur, а не мгновенно исчезает.
+        wrapperEl.style.opacity = String(1 - dissolveFraction)
+        wrapperEl.style.filter = `blur(${dissolveFraction * 10}px)`
       })
     })
     return unsub
@@ -85,15 +138,9 @@ export function JourneyTaglines() {
   return (
     <div style={wrapperStyle}>
       {PHRASES.map((phrase, i) => (
-        <div key={i} ref={(el) => { refs.current[i] = el }} style={phraseStyle}>
-          {phrase.big && (
-            <div style={{ fontSize: 'clamp(2.6rem, 8vw, 5rem)', fontWeight: 700, lineHeight: 1.1 }}>
-              {phrase.big}
-            </div>
-          )}
-          <div style={{ fontSize: 'clamp(1.3rem, 3.4vw, 2.2rem)', fontWeight: 700, lineHeight: 1.3, textTransform: 'uppercase' }}>
-            {phrase.text}
-          </div>
+        <div key={i} ref={(el) => { wrapperRefs.current[i] = el }} style={phraseStyle}>
+          {phrase.big && <div ref={(el) => { bigRefs.current[i] = el }} style={bigLineStyle} />}
+          <div ref={(el) => { textRefs.current[i] = el }} style={textLineStyle} />
         </div>
       ))}
     </div>
