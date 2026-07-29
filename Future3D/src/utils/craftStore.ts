@@ -6,6 +6,39 @@ import { create } from 'zustand'
 // "в руках" (см. Grabbable.tsx); overrides - переопределённые позиции,
 // per-id, поверх дефолтных из MapProps.tsx (объект без записи здесь
 // стоит на своём изначальном месте).
+//
+// Сайт статический (Vite build + scp на хостинг, без бэкенда/базы) -
+// "сохранить на карте" в смысле "чтобы ВСЕ посетители видели новую
+// раскладку" отсюда напрямую невозможно, это требовало бы сервера.
+// Компромисс из двух частей:
+//  1) overrides зеркалируются в localStorage - расстановка переживает
+//     перезагрузку страницы В ЭТОМ ЖЕ браузере (то, что раньше "не
+//     сохранялось" и обнулялось при каждом заходе).
+//  2) кнопка "Экспорт" в HUD (GameMode.tsx) копирует текущие overrides
+//     готовым для вставки кодом - результат присылается разработчику,
+//     который переносит эти координаты в MapProps.tsx как новые
+//     defaultPosition и выкладывает обновлённую сборку - тогда раскладка
+//     станет постоянной уже для всех.
+const STORAGE_KEY = 'future3d-craft-overrides'
+
+function loadOverrides(): Record<string, [number, number, number]> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveOverrides(overrides: Record<string, [number, number, number]>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides))
+  } catch {
+    // localStorage недоступен (приватный режим и т.п.) - расстановка
+    // просто не переживёт перезагрузку, это не повод падать с ошибкой.
+  }
+}
+
 interface CraftState {
   active: boolean
   heldId: string | null
@@ -14,17 +47,29 @@ interface CraftState {
   pickUp: (id: string) => void
   place: (id: string, position: [number, number, number]) => void
   cancel: () => void
+  resetAll: () => void
 }
 
 export const useCraftStore = create<CraftState>((set) => ({
   active: false,
   heldId: null,
-  overrides: {},
+  overrides: loadOverrides(),
   toggle: () => set((s) => ({ active: !s.active, heldId: null })),
   pickUp: (id) => set((s) => (s.active && !s.heldId ? { heldId: id } : {})),
   place: (id, position) =>
-    set((s) => ({ heldId: null, overrides: { ...s.overrides, [id]: position } })),
+    set((s) => {
+      const overrides = { ...s.overrides, [id]: position }
+      saveOverrides(overrides)
+      return { heldId: null, overrides }
+    }),
   cancel: () => set({ heldId: null }),
+  // "Вернуть всё как было" - сбрасывает и локальные overrides, и
+  // localStorage, без этого отменить неудачную перестановку можно было
+  // бы только вручную растащив объекты обратно.
+  resetAll: () => {
+    saveOverrides({})
+    set({ overrides: {}, heldId: null })
+  },
 }))
 
 // Живая позиция "призрака" (превью места установки) во время переноса -

@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
@@ -71,9 +71,31 @@ export function GameMode() {
   const toggleGodMode = useGodModeStore((s) => s.toggle)
   const craftActive = useCraftStore((s) => s.active)
   const toggleCraft = useCraftStore((s) => s.toggle)
+  const craftOverrides = useCraftStore((s) => s.overrides)
+  const resetCraft = useCraftStore((s) => s.resetAll)
+  const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const drivingId = useDriveStore((s) => s.drivingId)
   const nearCarId = useDriveStore((s) => s.nearCarId)
   const isMobile = useIsMobileViewport()
+
+  // Сайт статический - нет сервера, чтобы "сохранить на карте" для ВСЕХ
+  // посетителей прямо из браузера (см. подробности в craftStore.ts).
+  // Эта кнопка копирует текущую расстановку готовым для вставки кодом -
+  // результат нужно прислать разработчику, чтобы перенести в MapProps.tsx
+  // и выложить обновлённую сборку.
+  const exportPositions = async () => {
+    const lines = Object.entries(craftOverrides).map(
+      ([id, pos]) => `  ${id}: [${pos.map((n) => Math.round(n * 100) / 100).join(', ')}]`,
+    )
+    const text = lines.length > 0 ? `{\n${lines.join(',\n')}\n}` : '{} (ничего не переставлено)'
+    try {
+      await navigator.clipboard.writeText(text)
+      setExportStatus('copied')
+    } catch {
+      setExportStatus('error')
+    }
+    setTimeout(() => setExportStatus('idle'), 2500)
+  }
 
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
   // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
@@ -259,20 +281,67 @@ export function GameMode() {
             top: `calc(${edgeInset} + ${btnMinHeight} + 0.6rem + env(safe-area-inset-top))`,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: '0.4rem 0.9rem',
-            background: 'rgba(10, 17, 32, 0.7)',
-            border: '1px solid rgba(95, 212, 255, 0.4)',
-            borderRadius: '999px',
-            color: '#c8ecff',
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: '0.65rem',
-            letterSpacing: '0.04em',
-            whiteSpace: 'nowrap',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.5rem',
             zIndex: 1001,
-            pointerEvents: 'none',
           }}
         >
-          Клик по объекту — взять, ещё клик — поставить
+          <div
+            style={{
+              padding: '0.4rem 0.9rem',
+              background: 'rgba(10, 17, 32, 0.7)',
+              border: '1px solid rgba(95, 212, 255, 0.4)',
+              borderRadius: '999px',
+              color: '#c8ecff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.65rem',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            Клик по объекту — взять, ещё клик — поставить
+          </div>
+          {/* Позиции переживают перезагрузку страницы (localStorage), но
+              только в ЭТОМ браузере - "Экспорт" копирует их кодом,
+              который нужно прислать разработчику, чтобы раскладка стала
+              постоянной для всех посетителей сайта (см. craftStore.ts). */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={exportPositions}
+              style={{
+                padding: '0.4rem 0.9rem',
+                background: 'rgba(10, 17, 32, 0.7)',
+                border: '1px solid rgba(255, 215, 106, 0.6)',
+                borderRadius: '999px',
+                color: '#ffe9b0',
+                fontFamily: "'Orbitron', sans-serif",
+                fontSize: '0.65rem',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+              }}
+            >
+              {exportStatus === 'copied' ? 'Скопировано!' : exportStatus === 'error' ? 'Не вышло скопировать' : 'Экспорт позиций'}
+            </button>
+            <button
+              onClick={resetCraft}
+              style={{
+                padding: '0.4rem 0.9rem',
+                background: 'rgba(10, 17, 32, 0.7)',
+                border: '1px solid rgba(255, 138, 138, 0.5)',
+                borderRadius: '999px',
+                color: '#ffb3b3',
+                fontFamily: "'Orbitron', sans-serif",
+                fontSize: '0.65rem',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+              }}
+            >
+              Сбросить всё
+            </button>
+          </div>
         </div>
       )}
 
@@ -317,22 +386,30 @@ export function GameMode() {
           часть бага была не только в God Mode - кнопка "Прыжок" так же
           не реагировала на тач и в обычном режиме, просто раньше это не
           проверялось отдельно от свайпа). zIndex:1001 поднимает кнопку
-          выше слоя свайпа. */}
+          выше слоя свайпа. По отзыву клиента - "страшная кнопка прыжок,
+          убрать, и так понятно, что пробел" - на десктопе есть
+          физическая клавиатура (Space уже работает через KEYBOARD_MAP),
+          этот тач-виджет там не нужен и просто мешает - показываем
+          только на мобильном, где ему и положено быть единственным
+          способом прыгнуть. */}
       <SwipeControls />
-      <VirtualButton
-        id="jump"
-        label={godModeActive ? 'Вверх' : 'Прыжок'}
-        buttonWrapperStyle={{
-          bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
-          right: `calc(${edgeInset} + ${minimapClearance} + env(safe-area-inset-right))`,
-          left: 'auto',
-          top: 'auto',
-          zIndex: 1001,
-        }}
-      />
+      {isMobile && (
+        <VirtualButton
+          id="jump"
+          label={godModeActive ? 'Вверх' : 'Прыжок'}
+          buttonWrapperStyle={{
+            bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
+            right: `calc(${edgeInset} + ${minimapClearance} + env(safe-area-inset-right))`,
+            left: 'auto',
+            top: 'auto',
+            zIndex: 1001,
+          }}
+        />
+      )}
       {/* Кнопка "Вниз" - только в God Mode (в обычном режиме спуска нет и
-          клавиша Ctrl/C тоже ничего не делает, см. PlayerCharacter.tsx). */}
-      {godModeActive && (
+          клавиша Ctrl/C тоже ничего не делает, см. PlayerCharacter.tsx),
+          и только на мобильном - той же причине, что и "Прыжок" выше. */}
+      {isMobile && godModeActive && (
         <VirtualButton
           id="descend"
           label="Вниз"
