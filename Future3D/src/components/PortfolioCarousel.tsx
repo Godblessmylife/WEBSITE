@@ -9,6 +9,7 @@ import { THEMES, createThemeTexture } from '@/utils/themeTexture'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { useGameStore } from '@/utils/gameStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
+import { useInView } from '@/hooks/useInView'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -92,6 +93,10 @@ export function PortfolioCarousel() {
   const isMobile = useIsMobileViewport()
   const dragRef = useRef<DragState>({ active: false, lastX: 0, velocity: 0.15 })
   const rotationRef = useRef(0)
+  // Canvas отложен до приближения к области видимости - см. useInView.ts
+  // и общее объяснение проблемы в JourneyScene.tsx (все Canvas-секции
+  // ниже путешествия раньше жили одновременно с самой первой секунды).
+  const [sectionRef, inView] = useInView<HTMLElement>()
 
   if (isGameActive) return null
 
@@ -112,6 +117,7 @@ export function PortfolioCarousel() {
   return (
     <section
       id="portfolio"
+      ref={sectionRef}
       style={{
         height: '100vh',
         position: 'relative',
@@ -119,6 +125,7 @@ export function PortfolioCarousel() {
           'radial-gradient(circle at 50% 38%, #182a45 0%, #0a1120 45%, #05070d 85%)',
       }}
     >
+      {inView && (
       <Canvas
         camera={{ position: [0, 1.4, 8.5], fov: 50 }}
         // БЫЛО touchAction:'none' - блокировало ЛЮБОЙ дефолтный тач-жест
@@ -148,6 +155,7 @@ export function PortfolioCarousel() {
             промахнуться мимо кадра, чем пересчитывать позицию/fov). */}
         <Carousel dragRef={dragRef} rotationRef={rotationRef} scale={isMobile ? 0.72 : 1} />
       </Canvas>
+      )}
     </section>
   )
 }

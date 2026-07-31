@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
+import { useInView } from '@/hooks/useInView'
 import computerModelUrl from '../models/computer.glb'
 
 // Клик по START раньше запускал ОДНОВРЕМЕННО: скачивание ~2.2 МБ (gzip)
@@ -123,76 +123,6 @@ function Computer() {
   return <primitive object={scene} scale={COMPUTER_SCALE} />
 }
 
-// Подсказки "зажми и поверни" / "зум" — по просьбе клиента: раньше
-// ничто на экране не намекало, что компьютер вообще можно вращать/
-// зумить (OrbitControls есть, но невидим глазу) - обычные DOM-бейджи
-// по бокам от объекта, а не часть 3D-сцены (проще уложить в макет
-// точным текстом/иконкой, не завязываясь на 3D-текст). pointerEvents:
-// 'none' — чисто информационные, не должны перехватывать drag/зум
-// у OrbitControls под ними.
-function RotateIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#5fd4ff" strokeWidth="2" strokeLinecap="round">
-      <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4" />
-      <path d="M3.5 3.8v5h5" />
-    </svg>
-  )
-}
-
-function ZoomIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#5fd4ff" strokeWidth="2" strokeLinecap="round">
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <line x1="20" y1="20" x2="15.4" y2="15.4" />
-      <line x1="7.5" y1="10.5" x2="13.5" y2="10.5" />
-      <line x1="10.5" y1="7.5" x2="10.5" y2="13.5" />
-    </svg>
-  )
-}
-
-const hintBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  padding: '0.5rem 1rem',
-  background: 'rgba(10, 17, 32, 0.7)',
-  border: '1px solid rgba(95, 212, 255, 0.5)',
-  borderRadius: '999px',
-  color: '#eafcff',
-  fontFamily: "'Orbitron', sans-serif",
-  fontSize: '0.75rem',
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  whiteSpace: 'nowrap',
-  pointerEvents: 'none',
-  animation: 'game-entry-hint-pulse 2.4s ease-in-out infinite',
-}
-
-function InteractionHints() {
-  return (
-    <>
-      <div style={{ ...hintBadgeStyle, left: '6%', top: '48%', transform: 'translateY(-50%)' }}>
-        Зажми
-      </div>
-      <div style={{ ...hintBadgeStyle, right: '6%', top: '48%', transform: 'translateY(-50%)', animationDelay: '0.4s' }}>
-        <RotateIcon />
-        Поверни · 360°
-      </div>
-      <div style={{ ...hintBadgeStyle, right: '6%', top: 'calc(48% + 3rem)', animationDelay: '0.8s' }}>
-        <ZoomIcon />
-        Приблизь
-      </div>
-      <style>{`
-        @keyframes game-entry-hint-pulse {
-          0%, 100% { opacity: 0.55; }
-          50% { opacity: 1; }
-        }
-      `}</style>
-    </>
-  )
-}
-
 // Секция после карусели портфолио: компьютер + висящая надпись START.
 // Клик по надписи включает isGameActive (см. utils/gameStore.ts) —
 // App.tsx монтирует поверх всего GameMode, когда флаг включён.
@@ -205,27 +135,38 @@ function InteractionHints() {
 export function GameEntry() {
   const setGameActive = useGameStore((s) => s.setGameActive)
   const isGameActive = useGameStore((s) => s.isGameActive)
+  // Canvas отложен до приближения к области видимости - см. useInView.ts
+  // и общее объяснение проблемы в JourneyScene.tsx (эта секция - самая
+  // последняя на странице, и раньше её Canvas всё равно жил с первой
+  // секунды загрузки, хотя пользователь может вообще не долистать сюда).
+  const [sectionRef, inView] = useInView<HTMLElement>()
   usePrefetchGame()
 
   return (
     <section
       id="game"
+      ref={sectionRef}
       style={{
         height: '100vh',
         position: 'relative',
-        background:
-          'radial-gradient(circle at 50% 38%, #182a45 0%, #0a1120 45%, #05070d 85%)',
+        // Фон убран отсюда - секция теперь часть общего непрерывного фона
+        // с ContactSection (см. обёртку в App.tsx, тот же комментарий).
       }}
     >
       {/* Пока идёт игра, этот Canvas всё равно полностью закрыт
           фикс-оверлеем GameMode - не рендерим его совсем, лишний живой
           WebGL-контекст на мобильном (см. подробности в JourneyScene.tsx,
           тот же клиентский баг "вылетает от малейшего лага"). */}
-      {!isGameActive && (
+      {!isGameActive && inView && (
         // touchAction: 'none' — иначе на телефоне жест вращения камеры
         // (OrbitControls) конкурирует со скроллом страницы через тот же
         // палец на канвасе.
-        <Canvas camera={{ position: [0, 2.4, 5.8], fov: 45 }} style={{ touchAction: 'none' }}>
+        // Камера придвинута ближе к компьютеру по просьбе клиента
+        // ("приблизь") - была [0, 2.4, 5.8], теперь плашка START и
+        // монитор сразу заполняют кадр без лишнего пустого пространства
+        // вокруг. maxDistance у OrbitControls ниже тоже уменьшен, чтобы
+        // зум колёсиком не мог отдалить обратно к старому дальнему кадру.
+        <Canvas camera={{ position: [0, 2.1, 4.3], fov: 45 }} style={{ touchAction: 'none' }}>
           {/* тот же "игровое меню" фон, что и под карточками портфолио */}
           <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
           <fog attach="fog" args={['#0a1120', 10, 30]} />
@@ -239,14 +180,13 @@ export function GameEntry() {
           <OrbitControls
             target={[0, 1.5, 0]}
             enablePan={false}
-            minDistance={2.5}
-            maxDistance={9}
+            minDistance={2}
+            maxDistance={6.5}
             minPolarAngle={Math.PI / 4}
             maxPolarAngle={Math.PI / 1.7}
           />
         </Canvas>
       )}
-      {!isGameActive && <InteractionHints />}
     </section>
   )
 }

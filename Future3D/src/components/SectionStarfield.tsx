@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
 import type { Group } from 'three'
 import { useGameStore } from '@/utils/gameStore'
+import { useInView } from '@/hooks/useInView'
 
 // Общий анимированный звёздный фон для обычных DOM-секций (О нас, Цены,
 // Контакты) — тот же приём "игрового меню", что уже стоит под карточками
@@ -29,10 +30,17 @@ export function SectionStarfield() {
   // См. подробное объяснение в JourneyScene.tsx (тот же клиентский баг:
   // "вылетает" на мобильном от лишних одновременно живых контекстов).
   const isGameActive = useGameStore((s) => s.isGameActive)
+  // Canvas монтируется только когда секция приближается к области
+  // видимости (см. useInView.ts) - иначе все три этих Canvas жили бы с
+  // самой первой секунды на странице, ещё до того, как пользователь до
+  // них доскроллит (жалоба клиента на медленную загрузку/тормоза).
+  const [ref, inView] = useInView<HTMLDivElement>()
+
   if (isGameActive) return null
 
   return (
     <div
+      ref={ref}
       style={{
         position: 'absolute',
         inset: 0,
@@ -40,9 +48,11 @@ export function SectionStarfield() {
         pointerEvents: 'none',
       }}
     >
-      <Canvas camera={{ position: [0, 0, 1], fov: 75 }}>
-        <RotatingStars />
-      </Canvas>
+      {inView && (
+        <Canvas camera={{ position: [0, 0, 1], fov: 75 }}>
+          <RotatingStars />
+        </Canvas>
+      )}
     </div>
   )
 }

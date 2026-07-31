@@ -19,20 +19,39 @@ const TELEGRAM_URL = `https://t.me/${TELEGRAM_HANDLE}`
 // менее семантично, чем <a> (не работает открытие в новой вкладке
 // правой кнопкой/копирование ссылки), но безопаснее, чем чинить
 // внутренности вставленного компонента вслепую.
+//
+// Логотип — настоящие фирменные цвета Telegram (градиент #37BBFE ->
+// #007DBB на круглой подложке, белый самолётик) вместо одноцветного
+// silhouette-варианта: по запросу клиента "логотип телеграм голубой" и
+// "сделай красивее". Обводка/свечение кнопки в тон логотипа отличают её
+// от остальных LiquidButton на сайте — понятно, что это ИМЕННО контакт.
+function TelegramIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 240 240" aria-hidden="true">
+      <circle cx="120" cy="120" r="120" fill="url(#telegram-gradient)" />
+      <path
+        d="M186 68 165 172c-1.6 7-6 8.6-12 5.4l-33-24-16 15.4c-1.8 1.8-3.3 3.3-6.7 3.3l2.4-34 62-56c2.7-2.4-.6-3.7-4.2-1.3l-76.6 48.3-33-10.3c-7.2-2.2-7.3-7.2 1.5-10.7l129-49.7c6-2.2 11.2 1.4 9.3 11.6Z"
+        fill="#fff"
+      />
+      <defs>
+        <linearGradient id="telegram-gradient" x1="0" y1="0" x2="0" y2="240" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#37BBFE" />
+          <stop offset="1" stopColor="#007DBB" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
 function TelegramButton() {
   return (
     <LiquidButton
-      size="lg"
-      className="rounded-full"
+      size="xl"
+      className="rounded-full border border-[#37BBFE]/50 text-[#eafcff] shadow-[0_0_28px_rgba(55,187,254,0.35)] hover:shadow-[0_0_42px_rgba(55,187,254,0.55)]"
       style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}
       onClick={() => window.open(TELEGRAM_URL, '_blank', 'noopener,noreferrer')}
     >
-      <svg width="20" height="20" viewBox="0 0 240 240" fill="none" aria-hidden="true">
-        <path
-          d="M186 68 165 172c-1.6 7-6 8.6-12 5.4l-33-24-16 15.4c-1.8 1.8-3.3 3.3-6.7 3.3l2.4-34 62-56c2.7-2.4-.6-3.7-4.2-1.3l-76.6 48.3-33-10.3c-7.2-2.2-7.3-7.2 1.5-10.7l129-49.7c6-2.2 11.2 1.4 9.3 11.6Z"
-          fill="currentColor"
-        />
-      </svg>
+      <TelegramIcon />
       Написать в Telegram
     </LiquidButton>
   )
@@ -51,7 +70,10 @@ export function ContactSection() {
         justifyContent: 'center',
         textAlign: 'center',
         padding: '6rem 1.5rem',
-        background: 'radial-gradient(circle at 50% 50%, #101a2e 0%, #05070d 70%)',
+        // Фон убран отсюда - секция теперь часть общего непрерывного фона
+        // с GameEntry (см. обёртку в App.tsx): раньше у каждой секции был
+        // свой отдельный radial-gradient, и на стыке между ними была
+        // заметная граница/шов по просьбе клиента "сделай одно целое".
         overflow: 'hidden',
       }}
     >

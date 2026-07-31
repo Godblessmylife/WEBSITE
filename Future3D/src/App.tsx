@@ -14,7 +14,6 @@ import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
 import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
-import { JourneyTuner } from '@/components/JourneyTuner'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
 import { JourneyTaglines } from '@/components/JourneyTaglines'
 import { useGameStore } from '@/utils/gameStore'
@@ -56,8 +55,21 @@ export function App() {
       <AboutSection />
       <PortfolioCarousel />
       <PricingSection />
-      <ContactSection />
-      <GameEntry />
+      {/* Общий фон на обе секции - раньше у ContactSection и GameEntry
+          были свои отдельные radial-gradient (разные центры/цвета), и на
+          стыке между ними был заметный шов. По просьбе клиента "сделай
+          одно целое" - один непрерывный градиент на обёртке вместо двух
+          на каждой секции по отдельности (сами секции больше не красят
+          фон, см. их комментарии). */}
+      <div
+        style={{
+          position: 'relative',
+          background: 'radial-gradient(circle at 50% 25%, #182a45 0%, #0a1120 45%, #05070d 85%)',
+        }}
+      >
+        <ContactSection />
+        <GameEntry />
+      </div>
 
       {isGameActive && (
         <GameErrorBoundary onExit={() => setGameActive(false)}>
@@ -69,7 +81,9 @@ export function App() {
 
       {isGalleryOpen && <PortfolioGallery />}
 
-      <JourneyTuner />
+      {/* Тюнер путешествия (шестерёнка в левом нижнем углу) временно
+          убран по просьбе клиента - сам компонент (JourneyTuner.tsx)
+          никуда не делся, просто не рендерится здесь. */}
     </>
   )
 }
