@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
 import { useGodModeStore } from '@/utils/godModeStore'
-import { useCraftStore } from '@/utils/craftStore'
+import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { CraftModeController } from './CraftModeController'
 import { CraftGhost } from './CraftGhost'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
@@ -113,6 +113,24 @@ export function GameMode() {
   // мини-картой (та же зона экрана, но у карты z-index выше).
   const minimapClearance = isMobile ? '96px' : '180px'
 
+  // Ставит объект, "взятый в руки" в режиме CRAFT, при клике КУДА УГОДНО
+  // мимо других интерактивных объектов - по жалобе клиента "жму на
+  // объект, ничего не происходит": хитбокс объекта (Grabbable.tsx) во
+  // время переноса стоит на его СТАРОМ месте (сама модель спрятана,
+  // видна только полупрозрачная "тень"-призрак на новом месте, см.
+  // CraftGhost.tsx) - клик по НОВОМУ месту (где призрак) раньше никуда
+  // не попадал и просто ничего не делал. onPointerMissed у R3F
+  // срабатывает именно тогда, когда клик не задел ни один интерактивный
+  // объект сцены (земля/декорации без onClick это не объекты-цели) -
+  // ставим объект туда, где сейчас стоит призрак.
+  const handleCanvasPointerMissed = () => {
+    const { heldId, heldOriginalY } = useCraftStore.getState()
+    if (!heldId || heldOriginalY === null) return
+    const ghost = craftGhostStore.getState()
+    if (!ghost.visible) return
+    useCraftStore.getState().place(heldId, [ghost.x, heldOriginalY, ghost.z])
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
       {/* Тени (shadow map + рендер каждого объекта в него ещё раз)
@@ -124,6 +142,7 @@ export function GameMode() {
         camera={{ fov: 60, near: 0.1, far: 300 }}
         dpr={reduced ? [1, 1.5] : [1, 2]}
         shadows={!reduced}
+        onPointerMissed={handleCanvasPointerMissed}
       >
         <AdaptivePerformance />
         <color attach="background" args={['#0a1120']} />

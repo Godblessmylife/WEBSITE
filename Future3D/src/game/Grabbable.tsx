@@ -77,12 +77,16 @@ export function Grabbable({
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     if (isHeld) {
+      // Клик прямо по (невидимому - модель спрятана, пока держим) старому
+      // хитбоксу тоже ставит объект - на случай, если пользователь кликнет
+      // именно туда. Основной способ поставить - клик КУДА УГОДНО ещё,
+      // см. onPointerMissed в GameMode.tsx.
       const ghost = craftGhostStore.getState()
       if (ghost.visible) {
         useCraftStore.getState().place(id, [ghost.x, position[1], ghost.z])
       }
     } else if (!heldId) {
-      useCraftStore.getState().pickUp(id)
+      useCraftStore.getState().pickUp(id, position[1])
     }
   }
 

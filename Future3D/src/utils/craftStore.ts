@@ -42,9 +42,14 @@ function saveOverrides(overrides: Record<string, [number, number, number]>) {
 interface CraftState {
   active: boolean
   heldId: string | null
+  // Y объекта, взятого в руки - записывается в момент pickUp (Grabbable.tsx
+  // знает свою текущую позицию, центральный обработчик клика "поставить
+  // куда угодно" в GameMode.tsx - нет). Только X/Z переставляются драгом
+  // (см. Grabbable.tsx), Y объекта остаётся тем же, каким было.
+  heldOriginalY: number | null
   overrides: Record<string, [number, number, number]>
   toggle: () => void
-  pickUp: (id: string) => void
+  pickUp: (id: string, y: number) => void
   place: (id: string, position: [number, number, number]) => void
   cancel: () => void
   resetAll: () => void
@@ -53,22 +58,23 @@ interface CraftState {
 export const useCraftStore = create<CraftState>((set) => ({
   active: false,
   heldId: null,
+  heldOriginalY: null,
   overrides: loadOverrides(),
-  toggle: () => set((s) => ({ active: !s.active, heldId: null })),
-  pickUp: (id) => set((s) => (s.active && !s.heldId ? { heldId: id } : {})),
+  toggle: () => set((s) => ({ active: !s.active, heldId: null, heldOriginalY: null })),
+  pickUp: (id, y) => set((s) => (s.active && !s.heldId ? { heldId: id, heldOriginalY: y } : {})),
   place: (id, position) =>
     set((s) => {
       const overrides = { ...s.overrides, [id]: position }
       saveOverrides(overrides)
-      return { heldId: null, overrides }
+      return { heldId: null, heldOriginalY: null, overrides }
     }),
-  cancel: () => set({ heldId: null }),
+  cancel: () => set({ heldId: null, heldOriginalY: null }),
   // "Вернуть всё как было" - сбрасывает и локальные overrides, и
   // localStorage, без этого отменить неудачную перестановку можно было
   // бы только вручную растащив объекты обратно.
   resetAll: () => {
     saveOverrides({})
-    set({ overrides: {}, heldId: null })
+    set({ overrides: {}, heldId: null, heldOriginalY: null })
   },
 }))
 
