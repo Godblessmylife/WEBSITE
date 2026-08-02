@@ -16,6 +16,7 @@ import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
 import { JourneyTaglines } from '@/components/JourneyTaglines'
+import { ScrollHint } from '@/components/ScrollHint'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
@@ -46,6 +47,11 @@ export function App() {
           <JourneyScene />
           <StratosphereFlash />
           <JourneyTaglines />
+          {/* По просьбе клиента: люди не понимали, что страницу нужно
+              скроллить - путешествие занимает целый экран (sticky) и без
+              подсказки выглядит как статичная картинка. Сама гаснет после
+              первого скролла, см. ScrollHint.tsx. */}
+          <ScrollHint />
         </div>
       </div>
 

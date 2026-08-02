@@ -1,0 +1,13 @@
+{
+  "name": "Future3D — JavaScript разработчик",
+  "short_name": "Future3D",
+  "description": "Сайты, 3D-сцены и игры под ключ.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "icons": [
+    { "src": "/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
