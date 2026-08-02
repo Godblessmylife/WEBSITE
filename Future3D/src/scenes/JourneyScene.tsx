@@ -9,6 +9,7 @@ import { CloudZone } from './CloudZone'
 import { Ufos } from './Ufos'
 import { SpaceTravelEffect } from './SpaceTravelEffect'
 import { FloatingClock } from './FloatingClock'
+import { ParticleHeading } from './ParticleHeading'
 import { Effects } from '@/effects/Effects'
 import { usePerfStore } from '@/utils/perfStore'
 import { useGameStore } from '@/utils/gameStore'
@@ -77,6 +78,7 @@ export function JourneyScene() {
           с самим погружением к поверхности. */}
       <SpaceTravelEffect start={0.75} peakEnd={0.8} end={0.85} color="#ffe4b8" />
       <FloatingClock />
+      <ParticleHeading />
       <Effects />
     </Canvas>
   )
