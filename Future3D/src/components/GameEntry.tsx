@@ -123,6 +123,56 @@ function Computer() {
   return <primitive object={scene} scale={COMPUTER_SCALE} />
 }
 
+// Мягкое белое кольцо-свечение под компьютером - "неоновая подсветка"
+// по просьбе клиента. Не настоящий источник света (это делает
+// NeonAccentLight ниже), а декоративное пятно на текстуре - тот же
+// приём, что и у радиального свечения за плашкой START (createStartTexture).
+// Кольцо (а не сплошной круг) читается как настоящий неоновый контур на
+// полу, а не просто размытое пятно.
+function createNeonGlowTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')!
+  const cx = 128
+  const cy = 128
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 128)
+  glow.addColorStop(0, 'rgba(255,255,255,0.05)')
+  glow.addColorStop(0.62, 'rgba(255,255,255,0.1)')
+  glow.addColorStop(0.78, 'rgba(255,255,255,0.85)')
+  glow.addColorStop(0.9, 'rgba(255,255,255,0.15)')
+  glow.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, 256, 256)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
+function NeonBaseGlow() {
+  const texture = useMemo(() => createNeonGlowTexture(), [])
+  const meshRef = useRef<THREE.Mesh>(null!)
+
+  useFrame(({ clock }) => {
+    const pulse = 0.92 + Math.sin(clock.elapsedTime * 1.6) * 0.08
+    meshRef.current.scale.setScalar(pulse)
+  })
+
+  return (
+    <mesh ref={meshRef} position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[4.6, 4.6]} />
+      <meshBasicMaterial
+        map={texture}
+        color="#eafcff"
+        transparent
+        toneMapped={false}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
+  )
+}
+
 // Секция после карусели портфолио: компьютер + висящая надпись START.
 // Клик по надписи включает isGameActive (см. utils/gameStore.ts) —
 // App.tsx монтирует поверх всего GameMode, когда флаг включён.
@@ -174,6 +224,11 @@ export function GameEntry() {
           <ambientLight intensity={0.6} />
           <directionalLight position={[3, 5, 4]} intensity={1.3} />
           <pointLight position={[0, 2.5, 1]} color="#5fd4ff" intensity={2.5} distance={9} />
+          {/* Белая неоновая подсветка компьютера по просьбе клиента - как
+              настоящий свет снизу (лёгкий контровой эффект на корпусе), так
+              и декоративное кольцо-свечение на "полу" под ним. */}
+          <pointLight position={[0, 0.4, 1]} color="#ffffff" intensity={1.4} distance={5} />
+          <NeonBaseGlow />
           <Computer />
           <StartPlate onActivate={() => setGameActive(true)} />
 

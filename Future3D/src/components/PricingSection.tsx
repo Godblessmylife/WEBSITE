@@ -187,10 +187,6 @@ export function PricingSection() {
             <TierCard key={tier.name} tier={tier} />
           ))}
         </div>
-
-        <p style={{ textAlign: 'center', color: '#6d7f96', fontSize: '0.85rem', marginTop: '2rem' }}>
-          Точная стоимость зависит от объёма — обсудим в личных сообщениях.
-        </p>
       </div>
     </section>
   )
