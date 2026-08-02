@@ -21,7 +21,7 @@ const CAR_DEFAULTS: Record<string, { position: [number, number, number]; scale: 
 }
 
 function carRestPosition(id: string): [number, number, number] {
-  return useCraftStore.getState().overrides[id] ?? CAR_DEFAULTS[id].position
+  return useCraftStore.getState().overrides[id]?.position ?? CAR_DEFAULTS[id].position
 }
 
 const ENTER_DISTANCE = 4

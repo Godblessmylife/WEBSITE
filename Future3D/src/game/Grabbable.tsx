@@ -1,46 +1,87 @@
-import { useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import { RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { useDriveStore } from '@/utils/driveStore'
 
-// Оборачивает любую постройку MapProps.tsx в "берущийся" объект режима
-// разработчика (см. craftStore.ts). Пока active=false - ведёт себя как
-// обычный RigidBody (та же структура: снаружи RigidBody, внутри
-// коллайдер+модель), никакой разницы с "до Grabbable".
+// Оборачивает любую постройку MapProps.tsx в "берущийся" объект - БЕЗ
+// отдельного переключателя "режим CRAFT" (была отдельная кнопка в HUD,
+// по отзыву клиента только путала и "не работала"). Теперь: навёл
+// курсор на объект - сами появляются кнопка "Переместить" и шкала
+// масштаба (проценты); ничего не нужно включать заранее, работает на
+// любом объекте карты всегда.
 //
 // key={position.join(',')} на RigidBody - "fixed"-тела в rapier не
 // пересчитывают трансформ сами при смене position-пропа после монтирования
 // (задуманы как статичные), поэтому единственный надёжный способ
-// физически переставить объект - размонтировать/смонтировать RigidBody
-// заново на новом месте. Это происходит только в момент "поставить"
-// (редкое событие, не каждый кадр), так что цена пересоздания ничтожна.
+// физически переставить объект НАВСЕГДА - размонтировать/смонтировать
+// RigidBody заново на новом месте (редкое событие - момент клика
+// "поставить", не каждый кадр).
 //
-// Y (высота) НЕ переставляется через drag - только X/Z, взятые из
-// проекции курсора на плоскость земли (CraftModeController.tsx);
-// исходный вертикальный оффсет объекта (проверенный по bbox при
-// добавлении) сохраняется как есть.
+// Пока объект в процессе переноса, двигается не RigidBody (он остаётся
+// на старом месте до самого клика "поставить"), а вложенная group
+// (dragGroupRef) - её позицию каждый кадр напрямую мутирует useFrame,
+// без React-рендера. Так по экрану в реальном времени двигается САМА
+// видимая модель (как кубик в Майнкрафте), а не абстрактный превью-бокс,
+// как было в первой версии этой фичи.
 //
-// hitboxSize/hitboxCenter - те же числа, что уже посчитаны для
-// CuboidCollider каждого объекта (args - половины сторон, у boxGeometry
-// нужны полные, отсюда *2). ВАЖНО, почему это отдельный invisible mesh,
-// а не обработчики прямо на group с самой моделью (так было в первой
-// версии): наличие ЛЮБОГО pointer-обработчика на объекте включает для
-// него raycast на КАЖДОЕ движение мыши по канвасу — ВСЕГДА, даже когда
-// craft выключен (ранний return внутри обработчика тут не помогает, он
-// останавливает только ЛОГИКУ, но не сам raycast, который отрабатывает
-// раньше). С крупной/детальной геометрией (машины после увеличения,
-// Shop с scale=150 и т.п.) это оказалось катастрофически дорого —
-// проверено численно (тайминг между вызовами вырос в 5-6 раз при любом
-// движении курсора по экрану). Простой бокс (12 треугольников) вместо
-// детальной модели, да ещё и существующий в сцене ТОЛЬКО пока craft
-// активен, возвращает стоимость к нулю в обычном режиме игры — тот же
-// приём "невидимый хитбокс поверх модели", что и в QuestNpc.tsx, только
-// там это было для точности клика, здесь — в первую очередь для
-// производительности.
+// hitboxSize/hitboxCenter - размеры отдельного невидимого mesh для
+// клика/наведения, а не обработчики прямо на group с самой моделью:
+// наличие ЛЮБОГО pointer-обработчика на объекте включает для него
+// raycast на КАЖДОЕ движение мыши по канвасу. С крупной/детальной
+// геометрией (машины после увеличения, Shop со scale=150 и т.п.) это
+// оказалось катастрофически дорого - см. подробности в истории проекта.
+// Простой бокс (12 треугольников) вместо детальной модели держит эту
+// стоимость на уровне нуля, даже будучи смонтированным всегда (не только
+// в каком-то отдельном режиме) - раньше это было ключевой причиной
+// вообще городить отдельный тумблер "режим CRAFT", сейчас в нём просто
+// нет нужды.
+const HIDE_DELAY_MS = 220
+
+const panelStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.55rem',
+  padding: '0.6rem 0.85rem',
+  background: 'rgba(10, 17, 32, 0.88)',
+  border: '1px solid rgba(95, 212, 255, 0.55)',
+  borderRadius: '14px',
+  fontFamily: "'Orbitron', sans-serif",
+  whiteSpace: 'nowrap',
+  pointerEvents: 'auto',
+  cursor: 'default',
+}
+
+const moveButtonStyle: CSSProperties = {
+  padding: '0.35rem 1rem',
+  background: 'rgba(95, 212, 255, 0.2)',
+  border: '1px solid rgba(95, 212, 255, 0.75)',
+  borderRadius: '999px',
+  color: '#eafcff',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: '0.72rem',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
+}
+
+const scaleRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+}
+
+const scalePercentStyle: CSSProperties = {
+  color: '#c8ecff',
+  fontSize: '0.68rem',
+  minWidth: '2.6rem',
+  textAlign: 'center',
+}
+
 export function Grabbable({
   id,
   defaultPosition,
@@ -54,66 +95,140 @@ export function Grabbable({
   hitboxCenter?: [number, number, number]
   children: ReactNode
 }) {
-  const active = useCraftStore((s) => s.active)
-  const heldId = useCraftStore((s) => s.heldId)
   const override = useCraftStore((s) => s.overrides[id])
-  const position = override ?? defaultPosition
-  const isHeld = heldId === id
+  const movingId = useCraftStore((s) => s.movingId)
+  const position = override?.position ?? defaultPosition
+  const scaleMultiplier = override?.scale ?? 1
+  const isMoving = movingId === id
+  const anyoneMoving = movingId !== null
   // Пока эта же машина "за рулём" (CarDriving.tsx) - её припаркованная
-  // (эта) копия прячется, чтобы не было видно две машины разом (одна
-  // едет, другая стоит на месте, где её взяли). Для объектов, которые
-  // никогда не водятся, drivingId просто никогда не совпадёт с их id.
+  // (эта) копия прячется, включая хитбокс: иначе можно было бы навести
+  // курсор на пустое место, где машина стояла, и получить панель
+  // "Переместить" для объекта, который прямо сейчас едет в другом месте.
   const isDriven = useDriveStore((s) => s.drivingId === id)
+
   const [hovered, setHovered] = useState(false)
-  const visualRef = useRef<THREE.Group>(null!)
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dragGroupRef = useRef<THREE.Group>(null!)
+  const scaleGroupRef = useRef<THREE.Group>(null!)
+
+  useEffect(
+    () => () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    },
+    [],
+  )
+
+  // Сброс курсора, когда перенос закончился (пока он идёт, useFrame ниже
+  // каждый кадр держит его 'grabbing' сам, независимо от hover).
+  useEffect(() => {
+    if (!isMoving) document.body.style.cursor = hovered ? 'pointer' : 'auto'
+  }, [isMoving, hovered])
+
+  const showPanel = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = null
+    }
+    setHovered(true)
+  }
+  // Небольшая задержка перед скрытием панели - без неё увести курсор с
+  // хитбокса модели НА САМУ панель (которая висит чуть выше) было бы
+  // невозможно: onPointerOut срабатывал бы раньше, чем курсор долетит до
+  // кнопок, и панель бы исчезала прямо под курсором.
+  const scheduleHidePanel = () => {
+    hideTimeoutRef.current = setTimeout(() => setHovered(false), HIDE_DELAY_MS)
+  }
 
   useFrame((_, delta) => {
-    if (!visualRef.current) return
-    const targetScale = active && hovered && !heldId ? 1.05 : 1
-    const damp = 1 - Math.exp(-10 * delta)
-    visualRef.current.scale.setScalar(THREE.MathUtils.lerp(visualRef.current.scale.x, targetScale, damp))
-  })
+    if (scaleGroupRef.current) {
+      const hoverBounce = hovered && !anyoneMoving ? 1.05 : 1
+      const targetScale = hoverBounce * scaleMultiplier
+      const damp = 1 - Math.exp(-10 * delta)
+      scaleGroupRef.current.scale.setScalar(
+        THREE.MathUtils.lerp(scaleGroupRef.current.scale.x, targetScale, damp),
+      )
+    }
 
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation()
-    if (isHeld) {
-      // Клик прямо по (невидимому - модель спрятана, пока держим) старому
-      // хитбоксу тоже ставит объект - на случай, если пользователь кликнет
-      // именно туда. Основной способ поставить - клик КУДА УГОДНО ещё,
-      // см. onPointerMissed в GameMode.tsx.
+    if (!dragGroupRef.current) return
+    if (isMoving) {
       const ghost = craftGhostStore.getState()
       if (ghost.visible) {
-        useCraftStore.getState().place(id, [ghost.x, position[1], ghost.z])
+        dragGroupRef.current.position.set(ghost.x - position[0], 0, ghost.z - position[2])
       }
-    } else if (!heldId) {
-      useCraftStore.getState().pickUp(id, position[1])
+      document.body.style.cursor = 'grabbing'
+    } else if (dragGroupRef.current.position.x !== 0 || dragGroupRef.current.position.z !== 0) {
+      dragGroupRef.current.position.set(0, 0, 0)
     }
+  })
+
+  const onHitboxClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    if (!isMoving) return
+    // Клик прямо по объекту, который сейчас держим, тоже ставит его -
+    // на случай, если курсор в момент клика окажется точно над моделью.
+    // Основной способ поставить - клик КУДА УГОДНО ещё, см.
+    // onPointerMissed в GameMode.tsx.
+    const ghost = craftGhostStore.getState()
+    if (ghost.visible) {
+      useCraftStore.getState().place(id, [ghost.x, position[1], ghost.z])
+    }
+  }
+
+  const onHitboxPointerOver = (e: ThreeEvent<PointerEvent>) => {
+    if (anyoneMoving) return
+    e.stopPropagation()
+    showPanel()
   }
 
   return (
     <RigidBody key={position.join(',')} type="fixed" colliders={false} position={position}>
-      <group ref={visualRef} visible={!isHeld && !isDriven}>
-        {children}
+      <group ref={dragGroupRef}>
+        <group ref={scaleGroupRef}>
+          <group visible={!isDriven}>{children}</group>
+          {!isDriven && (
+            <mesh
+              position={hitboxCenter}
+              onClick={onHitboxClick}
+              onPointerOver={onHitboxPointerOver}
+              onPointerOut={scheduleHidePanel}
+            >
+              <boxGeometry args={hitboxSize} />
+              <meshBasicMaterial visible={false} />
+            </mesh>
+          )}
+          {hovered && !anyoneMoving && (
+            <Html
+              position={[hitboxCenter[0], hitboxCenter[1] + hitboxSize[1] / 2 + 0.5, hitboxCenter[2]]}
+              center
+              distanceFactor={8}
+            >
+              <div style={panelStyle} onMouseEnter={showPanel} onMouseLeave={scheduleHidePanel}>
+                <button
+                  style={moveButtonStyle}
+                  onClick={() => useCraftStore.getState().startMoving(id, position[1])}
+                >
+                  Переместить
+                </button>
+                <div style={scaleRowStyle}>
+                  <input
+                    type="range"
+                    min={50}
+                    max={200}
+                    step={5}
+                    value={Math.round(scaleMultiplier * 100)}
+                    onChange={(e) =>
+                      useCraftStore.getState().setScale(id, defaultPosition, Number(e.currentTarget.value) / 100)
+                    }
+                    style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '92px' }}
+                  />
+                  <span style={scalePercentStyle}>{Math.round(scaleMultiplier * 100)}%</span>
+                </div>
+              </div>
+            </Html>
+          )}
+        </group>
       </group>
-      {active && !isDriven && (
-        <mesh
-          position={hitboxCenter}
-          onClick={onClick}
-          onPointerOver={(e: ThreeEvent<PointerEvent>) => {
-            if (heldId) return
-            e.stopPropagation()
-            setHovered(true)
-            document.body.style.cursor = 'grab'
-          }}
-          onPointerOut={() => {
-            setHovered(false)
-            document.body.style.cursor = 'auto'
-          }}
-        >
-          <boxGeometry args={hitboxSize} />
-          <meshBasicMaterial visible={false} />
-        </mesh>
-      )}
     </RigidBody>
   )
 }

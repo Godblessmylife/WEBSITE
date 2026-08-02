@@ -1,36 +1,64 @@
 import { create } from 'zustand'
 
-// "Режим разработчика" (кнопка CRAFT в GameMode.tsx) - как в Майнкрафте,
-// объекты на карте можно взять кликом и переставить в другое место.
-// active - общий тумблер режима; heldId - id объекта, который сейчас
-// "в руках" (см. Grabbable.tsx); overrides - переопределённые позиции,
-// per-id, поверх дефолтных из MapProps.tsx (объект без записи здесь
-// стоит на своём изначальном месте).
+// Объекты карты (MapProps.tsx) можно двигать/масштабировать прямо в
+// игре - БЕЗ отдельного переключателя "режим CRAFT" (была отдельная
+// кнопка, per отзыву клиента запутывала и "не работала"). Теперь просто:
+// навёл курсор на любой объект (Grabbable.tsx) - у него сами появляются
+// кнопка "Переместить" и шкала масштаба; ничего не нужно включать заранее.
 //
-// Сайт статический (Vite build + scp на хостинг, без бэкенда/базы) -
-// "сохранить на карте" в смысле "чтобы ВСЕ посетители видели новую
-// раскладку" отсюда напрямую невозможно, это требовало бы сервера.
-// Компромисс из двух частей:
-//  1) overrides зеркалируются в localStorage - расстановка переживает
-//     перезагрузку страницы В ЭТОМ ЖЕ браузере (то, что раньше "не
-//     сохранялось" и обнулялось при каждом заходе).
-//  2) кнопка "Экспорт" в HUD (GameMode.tsx) копирует текущие overrides
-//     готовым для вставки кодом - результат присылается разработчику,
-//     который переносит эти координаты в MapProps.tsx как новые
-//     defaultPosition и выкладывает обновлённую сборку - тогда раскладка
-//     станет постоянной уже для всех.
+// movingId - id объекта, который сейчас "в руках": в этот момент САМА
+// модель (не абстрактный превью-бокс, как было раньше) в реальном
+// времени следует за курсором - проекция на землю считается один раз за
+// кадр в CraftModeController.tsx и раздаётся всем Grabbable через
+// craftGhostStore ниже. movingOriginalY - высота объекта на момент начала
+// переноса: двигается только X/Z (проекция на землю), высота остаётся
+// той же, какой была - записывается в момент старта, т.к. у общего
+// обработчика клика "поставить" (см. onPointerMissed в GameMode.tsx) нет
+// своего способа узнать высоту конкретного объекта.
+//
+// overrides - переопределённые позиция/масштаб, per-id, поверх
+// дефолтных из MapProps.tsx (объект без записи здесь стоит на своём
+// изначальном месте с масштабом 1). Сайт статический (Vite build + scp
+// на хостинг, без бэкенда/базы) - "сохранить на карте" в смысле "чтобы
+// ВСЕ посетители видели новую раскладку" отсюда напрямую невозможно, это
+// требовало бы сервера. Компромисс: overrides зеркалируются в
+// localStorage - расстановка переживает перезагрузку страницы В ЭТОМ ЖЕ
+// браузере (постоянная для всех посетителей раскладка by-design требует
+// прислать координаты разработчику вручную).
 const STORAGE_KEY = 'future3d-craft-overrides'
 
-function loadOverrides(): Record<string, [number, number, number]> {
+export interface ObjectOverride {
+  position: [number, number, number]
+  scale: number
+}
+
+function loadOverrides(): Record<string, ObjectOverride> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const result: Record<string, ObjectOverride> = {}
+    for (const [id, value] of Object.entries(parsed)) {
+      // Формат до появления масштаба (просто [x,y,z]) - читаем как есть,
+      // масштаб по умолчанию 1, чтобы старые сохранённые расстановки не
+      // терялись при обновлении сайта.
+      if (Array.isArray(value) && value.length === 3) {
+        result[id] = { position: value as [number, number, number], scale: 1 }
+      } else if (value && typeof value === 'object' && Array.isArray((value as ObjectOverride).position)) {
+        const v = value as Partial<ObjectOverride>
+        result[id] = {
+          position: v.position as [number, number, number],
+          scale: typeof v.scale === 'number' ? v.scale : 1,
+        }
+      }
+    }
+    return result
   } catch {
     return {}
   }
 }
 
-function saveOverrides(overrides: Record<string, [number, number, number]>) {
+function saveOverrides(overrides: Record<string, ObjectOverride>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides))
   } catch {
@@ -39,51 +67,52 @@ function saveOverrides(overrides: Record<string, [number, number, number]>) {
   }
 }
 
+export const MIN_SCALE = 0.5
+export const MAX_SCALE = 2
+
 interface CraftState {
-  active: boolean
-  heldId: string | null
-  // Y объекта, взятого в руки - записывается в момент pickUp (Grabbable.tsx
-  // знает свою текущую позицию, центральный обработчик клика "поставить
-  // куда угодно" в GameMode.tsx - нет). Только X/Z переставляются драгом
-  // (см. Grabbable.tsx), Y объекта остаётся тем же, каким было.
-  heldOriginalY: number | null
-  overrides: Record<string, [number, number, number]>
-  toggle: () => void
-  pickUp: (id: string, y: number) => void
+  movingId: string | null
+  movingOriginalY: number | null
+  overrides: Record<string, ObjectOverride>
+  startMoving: (id: string, y: number) => void
   place: (id: string, position: [number, number, number]) => void
-  cancel: () => void
-  resetAll: () => void
+  cancelMoving: () => void
+  setScale: (id: string, defaultPosition: [number, number, number], scale: number) => void
 }
 
 export const useCraftStore = create<CraftState>((set) => ({
-  active: false,
-  heldId: null,
-  heldOriginalY: null,
+  movingId: null,
+  movingOriginalY: null,
   overrides: loadOverrides(),
-  toggle: () => set((s) => ({ active: !s.active, heldId: null, heldOriginalY: null })),
-  pickUp: (id, y) => set((s) => (s.active && !s.heldId ? { heldId: id, heldOriginalY: y } : {})),
+  // Не подхватывает второй объект, пока первый ещё не поставлен -
+  // одновременно двигать можно только что-то одно.
+  startMoving: (id, y) => set((s) => (s.movingId ? {} : { movingId: id, movingOriginalY: y })),
   place: (id, position) =>
     set((s) => {
-      const overrides = { ...s.overrides, [id]: position }
+      const prevScale = s.overrides[id]?.scale ?? 1
+      const overrides = { ...s.overrides, [id]: { position, scale: prevScale } }
       saveOverrides(overrides)
-      return { heldId: null, heldOriginalY: null, overrides }
+      return { movingId: null, movingOriginalY: null, overrides }
     }),
-  cancel: () => set({ heldId: null, heldOriginalY: null }),
-  // "Вернуть всё как было" - сбрасывает и локальные overrides, и
-  // localStorage, без этого отменить неудачную перестановку можно было
-  // бы только вручную растащив объекты обратно.
-  resetAll: () => {
-    saveOverrides({})
-    set({ overrides: {}, heldId: null, heldOriginalY: null })
-  },
+  cancelMoving: () => set({ movingId: null, movingOriginalY: null }),
+  setScale: (id, defaultPosition, scale) =>
+    set((s) => {
+      const position = s.overrides[id]?.position ?? defaultPosition
+      const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
+      const overrides = { ...s.overrides, [id]: { position, scale: clamped } }
+      saveOverrides(overrides)
+      return { overrides }
+    }),
 }))
 
-// Живая позиция "призрака" (превью места установки) во время переноса -
-// отдельный vanilla-стор (не часть useCraftStore выше), мутируется КАЖДЫЙ
-// КАДР в CraftModeController.tsx без React-рендера - тот же приём, что и
-// у minimapPlayerStore.ts (позиция игрока на миникарте), не через обычный
+// Живая точка на земле, куда сейчас смотрит курсор - отдельный vanilla-
+// стор (не часть useCraftStore выше), мутируется КАЖДЫЙ КАДР в
+// CraftModeController.tsx без React-рендера - тот же приём, что и у
+// minimapPlayerStore.ts (позиция игрока на миникарте), не через обычный
 // zustand-setState с подпиской компонентов, иначе лишний ре-рендер всего
-// дерева 60 раз в секунду ради одной движущейся точки.
+// дерева 60 раз в секунду ради одной движущейся точки. Grabbable.tsx
+// объекта, который сейчас двигают, читает её тоже каждый кадр напрямую
+// (getState()), без подписки - та же логика.
 export const craftGhostStore = create<{ x: number; y: number; z: number; visible: boolean }>(() => ({
   x: 0,
   y: 0,

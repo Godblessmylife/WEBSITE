@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from 'react'
+import { Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
@@ -10,7 +10,6 @@ import { usePerfStore } from '@/utils/perfStore'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { CraftModeController } from './CraftModeController'
-import { CraftGhost } from './CraftGhost'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
@@ -69,33 +68,9 @@ export function GameMode() {
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
   const godModeActive = useGodModeStore((s) => s.active)
   const toggleGodMode = useGodModeStore((s) => s.toggle)
-  const craftActive = useCraftStore((s) => s.active)
-  const toggleCraft = useCraftStore((s) => s.toggle)
-  const craftOverrides = useCraftStore((s) => s.overrides)
-  const resetCraft = useCraftStore((s) => s.resetAll)
-  const [exportStatus, setExportStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const drivingId = useDriveStore((s) => s.drivingId)
   const nearCarId = useDriveStore((s) => s.nearCarId)
   const isMobile = useIsMobileViewport()
-
-  // Сайт статический - нет сервера, чтобы "сохранить на карте" для ВСЕХ
-  // посетителей прямо из браузера (см. подробности в craftStore.ts).
-  // Эта кнопка копирует текущую расстановку готовым для вставки кодом -
-  // результат нужно прислать разработчику, чтобы перенести в MapProps.tsx
-  // и выложить обновлённую сборку.
-  const exportPositions = async () => {
-    const lines = Object.entries(craftOverrides).map(
-      ([id, pos]) => `  ${id}: [${pos.map((n) => Math.round(n * 100) / 100).join(', ')}]`,
-    )
-    const text = lines.length > 0 ? `{\n${lines.join(',\n')}\n}` : '{} (ничего не переставлено)'
-    try {
-      await navigator.clipboard.writeText(text)
-      setExportStatus('copied')
-    } catch {
-      setExportStatus('error')
-    }
-    setTimeout(() => setExportStatus('idle'), 2500)
-  }
 
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
   // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
@@ -113,22 +88,18 @@ export function GameMode() {
   // мини-картой (та же зона экрана, но у карты z-index выше).
   const minimapClearance = isMobile ? '96px' : '180px'
 
-  // Ставит объект, "взятый в руки" в режиме CRAFT, при клике КУДА УГОДНО
-  // мимо других интерактивных объектов - по жалобе клиента "жму на
-  // объект, ничего не происходит": хитбокс объекта (Grabbable.tsx) во
-  // время переноса стоит на его СТАРОМ месте (сама модель спрятана,
-  // видна только полупрозрачная "тень"-призрак на новом месте, см.
-  // CraftGhost.tsx) - клик по НОВОМУ месту (где призрак) раньше никуда
-  // не попадал и просто ничего не делал. onPointerMissed у R3F
-  // срабатывает именно тогда, когда клик не задел ни один интерактивный
-  // объект сцены (земля/декорации без onClick это не объекты-цели) -
-  // ставим объект туда, где сейчас стоит призрак.
+  // Ставит объект, который сейчас "в руках" (Grabbable.tsx, кнопка
+  // "Переместить" на всплывающей панели при наведении), при клике КУДА
+  // УГОДНО мимо других интерактивных объектов - основной способ
+  // поставить. onPointerMissed у R3F срабатывает именно тогда, когда
+  // клик не задел ни один интерактивный объект сцены (земля/декорации
+  // без onClick это не объекты-цели).
   const handleCanvasPointerMissed = () => {
-    const { heldId, heldOriginalY } = useCraftStore.getState()
-    if (!heldId || heldOriginalY === null) return
+    const { movingId, movingOriginalY } = useCraftStore.getState()
+    if (!movingId || movingOriginalY === null) return
     const ghost = craftGhostStore.getState()
     if (!ghost.visible) return
-    useCraftStore.getState().place(heldId, [ghost.x, heldOriginalY, ghost.z])
+    useCraftStore.getState().place(movingId, [ghost.x, movingOriginalY, ghost.z])
   }
 
   return (
@@ -191,11 +162,11 @@ export function GameMode() {
         <GameCamera ecctrlRef={ecctrlRef} />
         <GameDebugTracker ecctrlRef={ecctrlRef} />
         <MinimapTracker ecctrlRef={ecctrlRef} />
-        {/* Режим разработчика (кнопка CRAFT ниже) - контроллер бросает
-            луч из курсора на землю каждый кадр (craftStore.ts), призрак -
-            полупрозрачный превью места установки, пока что-то в руках. */}
+        {/* Перемещение объектов (Grabbable.tsx) - бросает луч из курсора
+            на землю каждый кадр, пока что-то "в руках" (craftStore.ts).
+            Сама модель следует за этой точкой в реальном времени - см.
+            подробности в Grabbable.tsx, отдельный превью-объект не нужен. */}
         <CraftModeController />
-        <CraftGhost />
       </Canvas>
 
       <div
@@ -265,104 +236,6 @@ export function GameMode() {
       >
         God Mode
       </button>
-
-      {/* "Режим разработчика" - как в Майнкрафте, объекты карты можно
-          взять кликом и переставить (Grabbable.tsx/craftStore.ts). По
-          центру верхней панели - единственное свободное место среди уже
-          занятых углов (счёт/квесты слева, God Mode/Выход справа). */}
-      <button
-        onClick={toggleCraft}
-        style={{
-          position: 'absolute',
-          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          padding: btnPadding,
-          minHeight: btnMinHeight,
-          background: craftActive ? 'rgba(95, 212, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
-          border: '1px solid rgba(95, 212, 255, 0.8)',
-          borderRadius: '999px',
-          color: craftActive ? '#04121c' : '#c8ecff',
-          fontFamily: "'Orbitron', sans-serif",
-          fontSize: btnFontSize,
-          fontWeight: craftActive ? 700 : 400,
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-          zIndex: 1001,
-        }}
-      >
-        CRAFT
-      </button>
-      {craftActive && (
-        <div
-          style={{
-            position: 'absolute',
-            top: `calc(${edgeInset} + ${btnMinHeight} + 0.6rem + env(safe-area-inset-top))`,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '0.5rem',
-            zIndex: 1001,
-          }}
-        >
-          <div
-            style={{
-              padding: '0.4rem 0.9rem',
-              background: 'rgba(10, 17, 32, 0.7)',
-              border: '1px solid rgba(95, 212, 255, 0.4)',
-              borderRadius: '999px',
-              color: '#c8ecff',
-              fontFamily: "'Orbitron', sans-serif",
-              fontSize: '0.65rem',
-              letterSpacing: '0.04em',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-            }}
-          >
-            Клик по объекту — взять, ещё клик — поставить
-          </div>
-          {/* Позиции переживают перезагрузку страницы (localStorage), но
-              только в ЭТОМ браузере - "Экспорт" копирует их кодом,
-              который нужно прислать разработчику, чтобы раскладка стала
-              постоянной для всех посетителей сайта (см. craftStore.ts). */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={exportPositions}
-              style={{
-                padding: '0.4rem 0.9rem',
-                background: 'rgba(10, 17, 32, 0.7)',
-                border: '1px solid rgba(255, 215, 106, 0.6)',
-                borderRadius: '999px',
-                color: '#ffe9b0',
-                fontFamily: "'Orbitron', sans-serif",
-                fontSize: '0.65rem',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              {exportStatus === 'copied' ? 'Скопировано!' : exportStatus === 'error' ? 'Не вышло скопировать' : 'Экспорт позиций'}
-            </button>
-            <button
-              onClick={resetCraft}
-              style={{
-                padding: '0.4rem 0.9rem',
-                background: 'rgba(10, 17, 32, 0.7)',
-                border: '1px solid rgba(255, 138, 138, 0.5)',
-                borderRadius: '999px',
-                color: '#ffb3b3',
-                fontFamily: "'Orbitron', sans-serif",
-                fontSize: '0.65rem',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              Сбросить всё
-            </button>
-          </div>
-        </div>
-      )}
 
       <button
         onClick={() => setGameActive(false)}
