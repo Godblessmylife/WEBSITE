@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react'
 import '@fontsource/orbitron/700.css'
-import '@fontsource/orbitron/500.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/600.css'
 import { useLenis } from '@/hooks/useLenis'

@@ -29,6 +29,7 @@ const SAMPLE_STEP = 6
 // скриншотом, чтобы помещаться в кадр по горизонтали при текущем
 // FOV/расстоянии камеры (см. LOCAL_OFFSET.z ниже) без обрезки по краям.
 const WORLD_WIDTH = 7.4
+const BASE_POINT_SIZE = 0.09
 
 function sampleTextParticles(): Float32Array {
   const canvas = document.createElement('canvas')
@@ -161,6 +162,28 @@ export function ParticleHeading() {
     groupRef.current.position.copy(state.camera.position).add(worldOffset)
     groupRef.current.quaternion.copy(state.camera.quaternion)
 
+    // На узком (портретном, мобильном) экране горизонтальный угол обзора
+    // при том же вертикальном FOV заметно уже, чем на десктопе - текст,
+    // подобранный под десктопный кадр (WORLD_WIDTH), на телефоне вылезал
+    // за края экрана (жалоба клиента "выходит за поля"). Каждый кадр
+    // пересчитываем, сколько мировых единиц реально видно по горизонтали
+    // на глубине заголовка, и вписываем текст в 84% этой ширины -
+    // одинаковый код без разбора на мобильный/десктопный кейс, просто
+    // само подстраивается под любое соотношение сторон.
+    const camera = state.camera as THREE.PerspectiveCamera
+    const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov) / 2
+    const visibleHalfWidth = Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
+    const fitScale = Math.min(1, (visibleHalfWidth * 0.84) / WORLD_WIDTH)
+    groupRef.current.scale.setScalar(fitScale)
+    // THREE.PointsMaterial.size - мировые единицы, не зависящие от
+    // масштаба родительского Object3D (sizeAttenuation считает размер
+    // точки от расстояния до камеры, а не от matrix scale) - без этой
+    // строки при уменьшении fitScale расстояние между частицами
+    // сокращалось, а сами точки оставались прежнего размера и начинали
+    // перекрываться, буквы "расплывались" (видно на мобильном скриншоте
+    // при проверке). Размер точки уменьшаем в той же пропорции.
+    materialRef.current.size = BASE_POINT_SIZE * fitScale
+
     // Плоскость заголовка всегда развёрнута на камеру (billboard) -
     // курсор пересекаем с этой же плоскостью в мировых координатах, а
     // затем переводим точку пересечения в локальные координаты группы,
@@ -177,6 +200,13 @@ export function ParticleHeading() {
 
     const positions = pointsRef.current.geometry.attributes.position.array as Float32Array
     const count = positions.length / 3
+    // needsUpdate заливает буфер позиций на GPU заново - есть смысл
+    // делать это, только если хоть одна частица реально сдвинулась.
+    // Раньше это выставлялось безусловно каждый кадр, включая ВСЁ время,
+    // пока курсор не трогает буквы (заголовок просто неподвижно висит) -
+    // на слабом мобильном GPU лишняя перезаливка ~600 вершин 60 раз в
+    // секунду ради ничего вносила свой вклад в жалобу клиента "тормозит".
+    let anyChanged = false
     for (let i = 0; i < count; i++) {
       const ix = i * 3
       const iy = ix + 1
@@ -206,11 +236,16 @@ export function ParticleHeading() {
         ease = SCATTER_EASE
       }
 
-      positions[ix] += (targetX - cx) * ease
-      positions[iy] += (targetY - cy) * ease
-      positions[iz] += (targetZ - positions[iz]) * ease
+      const stepX = (targetX - cx) * ease
+      const stepY = (targetY - cy) * ease
+      const stepZ = (targetZ - positions[iz]) * ease
+      if (Math.abs(stepX) > 0.0002 || Math.abs(stepY) > 0.0002 || Math.abs(stepZ) > 0.0002) anyChanged = true
+
+      positions[ix] += stepX
+      positions[iy] += stepY
+      positions[iz] += stepZ
     }
-    pointsRef.current.geometry.attributes.position.needsUpdate = true
+    if (anyChanged) pointsRef.current.geometry.attributes.position.needsUpdate = true
   })
 
   return (
@@ -223,7 +258,7 @@ export function ParticleHeading() {
           ref={materialRef}
           map={dotTexture}
           color="#f4f9ff"
-          size={0.09}
+          size={BASE_POINT_SIZE}
           sizeAttenuation
           transparent
           opacity={0}
