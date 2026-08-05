@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html, useProgress } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
-import { VirtualButton, Joystick } from 'ecctrl/input'
+import { VirtualButton } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
@@ -32,6 +32,7 @@ import { SpaceZone, SPACE_TELEPORT_TARGET, SPACE_RETURN_PORTAL_POSITION } from '
 import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
 import { CarEntryTrigger, DrivingCar, performCarInteraction } from './CarDriving'
+import { DynamicJoystick } from './DynamicJoystick'
 import { useDriveStore } from '@/utils/driveStore'
 
 const DESERT_PORTAL_POSITION = new THREE.Vector3(10, 0, -10)
@@ -255,7 +256,7 @@ export function GameMode() {
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
-        <GameDebugTracker ecctrlRef={ecctrlRef} />
+        <GameDebugTracker />
         <MinimapTracker ecctrlRef={ecctrlRef} />
         {/* Перемещение объектов (Grabbable.tsx) - бросает луч из курсора
             на землю каждый кадр, пока что-то "в руках" (craftStore.ts).
@@ -365,47 +366,34 @@ export function GameMode() {
         Выход
       </button>
 
-      {/* Тач-управление ходьбой - настоящий аналоговый джойстик
-          (ecctrl/input), а не свайп по всему экрану: по отзыву клиента
-          "ходит только влево/вправо/вперёд, куда тыкнул туда и пошёл" -
-          прежний свайп определял только ОДНО доминирующее направление на
-          весь жест, диагональ или "вперёд и чуть в сторону" были
-          невозможны. Джойстик отдаёт непрерывный x/y (см.
-          PlayerCharacter.tsx, movement.joystick) - можно вести пальцем в
-          любую сторону. Скрыт за рулём - там свой джойстик (см. ниже).
-          Круглая кнопка прыжка убрана целиком по более раннему отзыву
-          клиента - прыжок по Space остаётся доступен на десктопе, не
-          требуется ни для одного квеста, так что на мобильном это не
-          блокирует прохождение. */}
+      {/* Тач-управление ходьбой - настоящий аналоговый джойстик, а не
+          свайп по всему экрану: по отзыву клиента "ходит только влево/
+          вправо/вперёд, куда тыкнул туда и пошёл" - прежний свайп
+          определял только ОДНО доминирующее направление на весь жест.
+          Джойстик отдаёт непрерывный x/y (см. PlayerCharacter.tsx,
+          movement.joystick) - можно вести пальцем в любую сторону.
+          DynamicJoystick (свой компонент, не ecctrl/input Joystick) -
+          по отзыву клиента "джойстик статичен в одном месте, пусть
+          появляется там, где коснулся" - см. подробности выбора подхода
+          в самом DynamicJoystick.tsx. Зона касания - весь левый низ
+          экрана (под кнопками сверху), не только маленький кружок в углу.
+          Скрыт за рулём - там своя зона (см. ниже). Круглая кнопка прыжка
+          убрана целиком по более раннему отзыву клиента - прыжок по
+          Space остаётся доступен на десктопе, не требуется ни для одного
+          квеста, так что на мобильном это не блокирует прохождение. */}
       {isLoaded && isTouch && !drivingId && !needsRotate && (
-        <Joystick
+        <DynamicJoystick
           id="move"
-          joystickWrapperStyle={{
-            bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-            left: `calc(1.5rem + env(safe-area-inset-left))`,
-            top: 'auto',
-            right: 'auto',
-            zIndex: 1001,
-          }}
-          joystickBaseStyle={{ background: 'rgba(10, 17, 32, 0.55)', border: '2px solid rgba(95, 212, 255, 0.6)' }}
-          joystickKnobStyle={{ background: 'rgba(95, 212, 255, 0.85)' }}
+          zoneStyle={{ left: 0, top: '18%', width: '58%', height: '68%', zIndex: 1000 }}
         />
       )}
       {/* Управление машиной на телефоне - тоже джойстик, по просьбе
           клиента: вверх/вниз - газ/торможение и задний ход, влево/вправо
           - руль, плавно пропорционально наклону стика (см. CarDriving.tsx). */}
       {isLoaded && isTouch && drivingId && !needsRotate && (
-        <Joystick
+        <DynamicJoystick
           id="drive"
-          joystickWrapperStyle={{
-            bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-            left: `calc(1.5rem + env(safe-area-inset-left))`,
-            top: 'auto',
-            right: 'auto',
-            zIndex: 1001,
-          }}
-          joystickBaseStyle={{ background: 'rgba(10, 17, 32, 0.55)', border: '2px solid rgba(95, 212, 255, 0.6)' }}
-          joystickKnobStyle={{ background: 'rgba(95, 212, 255, 0.85)' }}
+          zoneStyle={{ left: 0, top: '18%', width: '58%', height: '68%', zIndex: 1000 }}
         />
       )}
       {/* Кнопка "Вниз" - только в God Mode (в обычном режиме спуска нет и

@@ -173,7 +173,11 @@ export function ParticleHeading() {
     const camera = state.camera as THREE.PerspectiveCamera
     const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov) / 2
     const visibleHalfWidth = Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
-    const fitScale = Math.min(1, (visibleHalfWidth * 0.84) / WORLD_WIDTH)
+    // 0.84 -> 0.96: по отзыву клиента "очень маленькая получилось на
+    // мобильном, почти не видно" - подгонка под ширину экрана и так уже
+    // не даёт вылезти за края, отдельный запас "на всякий случай" можно
+    // почти убрать.
+    const fitScale = Math.min(1, (visibleHalfWidth * 0.96) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
     // масштаба родительского Object3D (sizeAttenuation считает размер

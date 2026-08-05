@@ -1,108 +1,53 @@
-import { useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { EcctrlHandle } from 'ecctrl'
 import { useGameDebugStore } from '@/utils/gameDebugStore'
-import { usePerfStore } from '@/utils/perfStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
-
-const MAX_LOGGED_ERRORS = 3
 
 // useFrame работает только внутри дерева Canvas — эта часть монтируется
 // рядом с GameCamera и т.п. (внутри <Canvas>) и просто пишет в общий
 // zustand-store; сама ничего не рисует.
-export function GameDebugTracker({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
-  const setDebug = useGameDebugStore((s) => s.setDebug)
+export function GameDebugTracker() {
+  const setFps = useGameDebugStore((s) => s.setFps)
   const frameTimesRef = useRef<number[]>([])
 
   useFrame((_, delta) => {
     frameTimesRef.current.push(delta)
     if (frameTimesRef.current.length > 30) frameTimesRef.current.shift()
-
-    const handle = ecctrlRef.current
     const avgDelta = frameTimesRef.current.reduce((a, b) => a + b, 0) / frameTimesRef.current.length
-    setDebug({
-      fps: avgDelta > 0 ? Math.round(1 / avgDelta) : 0,
-      pos: handle ? `${handle.currPos.x.toFixed(1)}, ${handle.currPos.y.toFixed(1)}, ${handle.currPos.z.toFixed(1)}` : 'нет ссылки',
-      isMoving: handle?.isMoving ?? false,
-      isOnGround: handle?.isOnGround ?? false,
-      isFalling: handle?.isFalling ?? false,
-    })
+    setFps(avgDelta > 0 ? Math.round(1 / avgDelta) : 0)
   })
 
   return null
 }
 
-// Временный отладочный HUD поверх игры — по явной просьбе клиента следить
-// за работоспособностью, пока игра не отполирована окончательно. Ловит
-// как необработанные ошибки (window error/unhandledrejection — то, что
-// раньше можно было увидеть только через консоль браузера), так и живое
-// состояние персонажа из GameDebugTracker. Это обычный DOM-компонент —
-// рендерится СНАРУЖИ <Canvas>, поэтому не может сам звать useFrame.
+// По просьбе клиента - только FPS, без остальной диагностики (позиция/
+// состояние персонажа/лог ошибок), и без подписи "DEBUG" - раньше окно
+// было заметно крупнее и мешало на телефоне, теперь это просто короткая
+// строка "FPS: N", не занимающая места на экране. Крах теперь виден на
+// собственном экране GameErrorBoundary, а не только здесь - отдельный
+// лог ошибок в этом окне больше не нужен.
 export function GameDebugHUD() {
-  const { fps, pos, isMoving, isOnGround, isFalling } = useGameDebugStore()
-  const reduced = usePerfStore((s) => s.reduced)
+  const fps = useGameDebugStore((s) => s.fps)
   const isMobile = useIsMobileViewport()
-  const [errors, setErrors] = useState<string[]>([])
-
-  useEffect(() => {
-    const pushError = (message: string) => {
-      setErrors((prev) => [message, ...prev].slice(0, MAX_LOGGED_ERRORS))
-    }
-    const onError = (e: ErrorEvent) => pushError(e.message || String(e.error))
-    const onRejection = (e: PromiseRejectionEvent) => pushError(`unhandled promise: ${String(e.reason)}`)
-    window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', onRejection)
-    return () => {
-      window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', onRejection)
-    }
-  }, [])
 
   return (
     <div
       style={{
         position: 'absolute',
-        // Раньше стояло bottom-left - там же, где пеший/автомобильный
-        // джойстик (GameMode.tsx) - на телефоне окно накладывалось прямо
-        // на стик (отзыв клиента). Top-left под кнопками счёта/квестов тоже
-        // не подошёл - при высоте панели в 3-4 строки её нижний край всё
-        // равно задевал верх джойстика (замерено автотестом: bottom панели
-        // 196px против top джойстика 166px на 844x390). Top-RIGHT, под
-        // God Mode/Выход - единственное место без конкурентов вообще: не
-        // джойстик (bottom-left), не миникарта/кнопки "Вниз"/"Сесть"
-        // (bottom-right/center).
         top: `calc(${isMobile ? '0.75rem' : '1.5rem'} + ${isMobile ? '2.1rem' : '2.75rem'} + 0.5rem + env(safe-area-inset-top))`,
         right: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-right))`,
-        // По просьбе клиента окно ещё компактнее на мобильном: padding
-        // и maxWidth уменьшены, fontSize/lineHeight уменьшены чуть меньше
-        // (иначе текст стал бы нечитаемым на маленьком экране).
-        padding: isMobile ? '0.15rem 0.3rem' : '0.75rem 1rem',
-        background: 'rgba(5, 7, 13, 0.75)',
+        padding: isMobile ? '0.15rem 0.4rem' : '0.3rem 0.7rem',
+        background: 'rgba(5, 7, 13, 0.6)',
         border: '1px solid rgba(255, 255, 255, 0.15)',
-        borderRadius: isMobile ? '6px' : '12px',
+        borderRadius: isMobile ? '6px' : '10px',
         color: '#9db2c9',
         fontFamily: 'monospace',
-        fontSize: isMobile ? '0.4rem' : '0.75rem',
-        lineHeight: isMobile ? 1.25 : 1.5,
+        fontSize: isMobile ? '0.55rem' : '0.7rem',
         zIndex: 1001,
         pointerEvents: 'none',
-        maxWidth: isMobile ? '90px' : '320px',
       }}
     >
-      <div style={{ color: '#5fd4ff' }}>DEBUG</div>
-      <div>fps: {fps} | качество: {reduced ? 'снижено' : 'полное'}</div>
-      <div>pos: {pos}</div>
-      <div>
-        moving: {String(isMoving)} | ground: {String(isOnGround)} | falling: {String(isFalling)}
-      </div>
-      {errors.length > 0 && (
-        <div style={{ marginTop: '0.4rem', color: '#ff8a8a' }}>
-          {errors.map((err, i) => (
-            <div key={i}>⚠ {err}</div>
-          ))}
-        </div>
-      )}
+      FPS: {fps}
     </div>
   )
 }

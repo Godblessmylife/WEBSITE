@@ -2,11 +2,7 @@ import { create } from 'zustand'
 
 interface GameDebugState {
   fps: number
-  pos: string
-  isMoving: boolean
-  isOnGround: boolean
-  isFalling: boolean
-  setDebug: (state: Omit<GameDebugState, 'setDebug'>) => void
+  setFps: (fps: number) => void
 }
 
 // Отдельный store (а не React state прямо в компоненте) специально
@@ -16,9 +12,5 @@ interface GameDebugState {
 // React-стейт через проп-прокидывание сквозь границу Canvas.
 export const useGameDebugStore = create<GameDebugState>((set) => ({
   fps: 0,
-  pos: '—',
-  isMoving: false,
-  isOnGround: false,
-  isFalling: false,
-  setDebug: (state) => set(state),
+  setFps: (fps) => set({ fps }),
 }))
