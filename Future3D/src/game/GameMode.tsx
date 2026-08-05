@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html, useProgress } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
@@ -95,7 +95,40 @@ export function GameMode() {
   // поверх общего THREE.DefaultLoadingManager, не завязан на Canvas -
   // безопасно читать здесь же, снаружи. round(...) в GameLoadingScreen -
   // drei иногда отдаёт 99.997% и это никогда не станет 100 без округления.
-  const isLoaded = useProgress((s) => Math.round(s.progress) >= 100 && !s.active)
+  const assetsLoaded = useProgress((s) => Math.round(s.progress) >= 100 && !s.active)
+  // По отзыву клиента "загрузка такая быстрая, что её даже не видно" -
+  // если модели уже в кэше браузера (обычная ситуация после первого
+  // визита), useProgress добегает до 100% за десятки миллисекунд, и
+  // красивый экран загрузки с процентом попросту не успевает мелькнуть -
+  // выглядит как будто его вообще нет. Минимальная задержка не привязана
+  // к реальной загрузке (это не обман - сама загрузка всё ещё настоящая
+  // и может занять и больше секунды), она только гарантирует, что экран
+  // успевает быть замеченным, даже когда сама загрузка мгновенная.
+  const MIN_LOADING_SCREEN_MS = 1200
+  const [minDelayPassed, setMinDelayPassed] = useState(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => setMinDelayPassed(true), MIN_LOADING_SCREEN_MS)
+    return () => window.clearTimeout(t)
+  }, [])
+  const isLoaded = assetsLoaded && minDelayPassed
+
+  // Полное пересоздание Canvas (см. key ниже) - основной способ пережить
+  // потерю WebGL-контекста. По отзыву клиента "иногда выкидывает после
+  // того, как повернул экран, чего раньше не было" - поворот телефона
+  // резко меняет разрешение канваса (весь фреймбуфер под новый размер
+  // выделяется заново), и именно этот момент чаще всего проявляет
+  // нехватку GPU-памяти на телефоне (десятки .glb + WASM-физика
+  // одновременно) как потерю контекста. Пассивно ждать webglcontextrestored
+  // недостаточно: сам контекст может "восстановиться", но все текстуры/
+  // буферы Three.js всё равно потеряны безвозвратно - попытка рисовать
+  // ими дальше сама по себе кидает ошибку на следующем кадре (то самое
+  // "зависает и выкидывает с ошибкой"). Полный ремонт - Canvas
+  // размонтируется и создаётся заново с нуля, Three.js/Rapier поднимаются
+  // с чистого листа, а сами .glb берутся из кэша браузера (не перекачиваются
+  // заново) - визуально это доля секунды новой загрузки, а не полный сбой.
+  const [canvasKey, setCanvasKey] = useState(0)
+  const recoveryAttemptsRef = useRef(0)
+  const MAX_CONTEXT_RECOVERY_ATTEMPTS = 3
 
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
   // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
@@ -135,30 +168,45 @@ export function GameMode() {
           — одна из самых дорогих фич рендера, а тут всего одна DesertSun
           с castShadow, так что без теней мир не станет менее читаемым. */}
       <Canvas
+        key={canvasKey}
         camera={{ fov: 60, near: 0.1, far: 300 }}
-        dpr={reduced ? [1, 1.5] : [1, 2]}
+        // На тач-устройствах фиксированный dpr=1 (без ретина-суперсэмплинга)
+        // вместо "до 1.5x" - по отзыву клиента именно на телефоне (после
+        // поворота экрана, когда весь фреймбуфер перевыделяется под новый
+        // размер) чаще всего происходит потеря WebGL-контекста, а лишние
+        // 1.5x/2x пикселей на кадр - самый большой и самый легко устранимый
+        // потребитель GPU-памяти из всего рендера. На десктопе (мышь,
+        // обычно куда больше видеопамяти) ретина по-прежнему включена.
+        dpr={isTouch ? 1 : reduced ? [1, 1.5] : [1, 2]}
         shadows={!reduced}
         onPointerMissed={handleCanvasPointerMissed}
         onCreated={({ gl }) => {
-          // По отзыву клиента "во время движения зависает и выкидывает из
-          // игры" - на телефонах с ограниченной памятью WebGL-контекст
-          // может "потеряться" под нагрузкой (десятки .glb + WASM-физика
-          // одновременно). Без preventDefault() браузер даже не пытается
-          // восстановить контекст - канвас остаётся НАВСЕГДА чёрным/
-          // замороженным, именно то, что описал клиент. С preventDefault()
-          // контекст чаще всего восстанавливается сам за доли секунды -
-          // если нет, через 3с чище выйти в меню (тот же setGameActive,
-          // что и кнопка "Выход"), чем оставлять мёртвый канвас.
-          const canvas = gl.domElement
-          let restoreTimeout: number | undefined
-          canvas.addEventListener('webglcontextlost', (event) => {
+          gl.domElement.addEventListener('webglcontextlost', (event) => {
+            // preventDefault() обязателен, иначе браузер даже не пытается
+            // восстановить контекст - без него канвас гарантированно
+            // остаётся мёртвым навсегда.
             event.preventDefault()
-            console.error('[GameMode] WebGL context lost - ожидаем восстановления')
-            restoreTimeout = window.setTimeout(() => setGameActive(false), 3000)
-          })
-          canvas.addEventListener('webglcontextrestored', () => {
-            console.warn('[GameMode] WebGL context restored')
-            window.clearTimeout(restoreTimeout)
+            recoveryAttemptsRef.current += 1
+            console.error(
+              '[GameMode] WebGL context lost, попытка восстановления',
+              recoveryAttemptsRef.current,
+            )
+            if (recoveryAttemptsRef.current > MAX_CONTEXT_RECOVERY_ATTEMPTS) {
+              // Несколько потерь подряд - устройство явно не тянет сцену
+              // целиком (нехватка GPU-памяти не пропадёт от ещё одной
+              // попытки). Чище выйти в меню, чем зациклиться на пересоздании.
+              setGameActive(false)
+              return
+            }
+            // НЕ ждём пассивно webglcontextrestored: даже когда браузер сам
+            // "восстанавливает" контекст, все текстуры/буферы Three.js всё
+            // равно безвозвратно потеряны - рисование ими на следующем
+            // кадре само кидает ошибку (то самое "зависает и выкидывает с
+            // ошибкой"). Полный ремонт Canvas (key ниже) надёжнее - React
+            // размонтирует старый канвас и создаёт новый с нуля, свежий
+            // WebGL-контекст, Three.js/Rapier поднимаются заново, а сами
+            // .glb берутся из кэша браузера, не перекачиваются заново.
+            window.setTimeout(() => setCanvasKey((k) => k + 1), 300)
           })
         }}
       >
