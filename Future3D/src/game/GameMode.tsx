@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
-import { VirtualButton } from 'ecctrl/input'
+import { VirtualButton, Joystick } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
@@ -11,6 +11,9 @@ import { useGodModeStore } from '@/utils/godModeStore'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { CraftModeController } from './CraftModeController'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
+import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
+import { useIsPortrait } from '@/utils/useIsPortrait'
+import { RotateDevicePrompt } from './RotateDevicePrompt'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
 import { PlayerCharacter } from './PlayerCharacter'
@@ -26,7 +29,6 @@ import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { Minimap, MinimapTracker } from './Minimap'
 import { SpaceZone, SPACE_TELEPORT_TARGET, SPACE_RETURN_PORTAL_POSITION } from './SpaceZone'
-import { SwipeControls } from './SwipeControls'
 import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
 import { CarEntryTrigger, DrivingCar, performCarInteraction } from './CarDriving'
@@ -71,6 +73,18 @@ export function GameMode() {
   const drivingId = useDriveStore((s) => s.drivingId)
   const nearCarId = useDriveStore((s) => s.nearCarId)
   const isMobile = useIsMobileViewport()
+  // useIsMobileViewport проверяет ШИРИНУ окна - у телефона в landscape
+  // (см. RotateDevicePrompt.tsx) она обычно БОЛЬШЕ 640px, так что для
+  // джойстиков/тач-специфичных элементов нужна проверка типа указателя
+  // (палец/мышь), а не текущего размера окна - иначе джойстики пропадали
+  // бы именно в момент, когда игрок поворачивает телефон, чтобы играть.
+  const isTouch = useIsTouchDevice()
+  const isPortrait = useIsPortrait()
+  // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
+  // портретный экран тесен для джойстиков слева и справа сразу - только
+  // для тач-устройств (на десктопе понятие "поворота окна" не имеет
+  // смысла и не должно ничего блокировать).
+  const needsRotate = isTouch && isPortrait
 
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
   // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
@@ -259,20 +273,56 @@ export function GameMode() {
         Выход
       </button>
 
-      {/* Тач-управление: весь экран - направленный свайп (см.
-          SwipeControls.tsx) вместо джойстика ecctrl/input - по просьбе
-          клиента ("свайп вверх - вперёд" и т.д.), не требует попадать
-          пальцем в конкретную область экрана. Круглая кнопка прыжка
-          (ecctrl/input VirtualButton) убрана целиком по просьбе клиента
-          ("убрать значок прыжка, круглый") - прыжок по Space остаётся
-          доступен на десктопе через KEYBOARD_MAP как раньше; прыжок не
+      {/* Тач-управление ходьбой - настоящий аналоговый джойстик
+          (ecctrl/input), а не свайп по всему экрану: по отзыву клиента
+          "ходит только влево/вправо/вперёд, куда тыкнул туда и пошёл" -
+          прежний свайп определял только ОДНО доминирующее направление на
+          весь жест, диагональ или "вперёд и чуть в сторону" были
+          невозможны. Джойстик отдаёт непрерывный x/y (см.
+          PlayerCharacter.tsx, movement.joystick) - можно вести пальцем в
+          любую сторону. Скрыт за рулём - там свой джойстик (см. ниже).
+          Круглая кнопка прыжка убрана целиком по более раннему отзыву
+          клиента - прыжок по Space остаётся доступен на десктопе, не
           требуется ни для одного квеста, так что на мобильном это не
           блокирует прохождение. */}
-      <SwipeControls />
+      {isTouch && !drivingId && !needsRotate && (
+        <Joystick
+          id="move"
+          joystickWrapperStyle={{
+            bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
+            left: `calc(1.5rem + env(safe-area-inset-left))`,
+            top: 'auto',
+            right: 'auto',
+            zIndex: 1001,
+          }}
+          joystickBaseStyle={{ background: 'rgba(10, 17, 32, 0.55)', border: '2px solid rgba(95, 212, 255, 0.6)' }}
+          joystickKnobStyle={{ background: 'rgba(95, 212, 255, 0.85)' }}
+        />
+      )}
+      {/* Управление машиной на телефоне - тоже джойстик, по просьбе
+          клиента: вверх/вниз - газ/торможение и задний ход, влево/вправо
+          - руль, плавно пропорционально наклону стика (см. CarDriving.tsx). */}
+      {isTouch && drivingId && !needsRotate && (
+        <Joystick
+          id="drive"
+          joystickWrapperStyle={{
+            bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
+            left: `calc(1.5rem + env(safe-area-inset-left))`,
+            top: 'auto',
+            right: 'auto',
+            zIndex: 1001,
+          }}
+          joystickBaseStyle={{ background: 'rgba(10, 17, 32, 0.55)', border: '2px solid rgba(95, 212, 255, 0.6)' }}
+          joystickKnobStyle={{ background: 'rgba(95, 212, 255, 0.85)' }}
+        />
+      )}
       {/* Кнопка "Вниз" - только в God Mode (в обычном режиме спуска нет и
           клавиша Ctrl/C тоже ничего не делает, см. PlayerCharacter.tsx),
-          и только на мобильном - той же причине, что и "Прыжок" выше. */}
-      {isMobile && godModeActive && (
+          и только на тач-устройстве - той же причине, что и джойстик выше
+          (isMobile проверяет ШИРИНУ окна, а не тип указателя - в landscape
+          телефон обычно шире 640px, кнопка пропала бы именно тогда, когда
+          нужна). */}
+      {isTouch && godModeActive && !needsRotate && (
         <VirtualButton
           id="descend"
           label="Вниз"
@@ -325,6 +375,12 @@ export function GameMode() {
       <QuestLog />
       <QuestDialogue />
       <TeleportEffect />
+
+      {/* Поверх всего остального - блокирует и джойстики, и HUD, пока
+          телефон в портретной ориентации (см. комментарий у needsRotate
+          выше). Живая проверка (useIsPortrait), а не разовая при входе -
+          если повернуть телефон обратно посреди игры, экран вернётся. */}
+      {needsRotate && <RotateDevicePrompt />}
     </div>
   )
 }

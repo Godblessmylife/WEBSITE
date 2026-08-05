@@ -2,13 +2,15 @@ import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useKeyboardControls, Clone } from '@react-three/drei'
+import { useJoystickStore } from 'ecctrl/input'
 import type { EcctrlHandle } from 'ecctrl'
 import * as THREE from 'three'
 import { useCraftStore } from '@/utils/craftStore'
 import { useDriveStore, driveLiveStore } from '@/utils/driveStore'
-import { useSwipeControlStore } from '@/utils/swipeControlStore'
 import car1Url from '../models/Car1.glb'
 import car2Url from '../models/car2.glb'
+
+const EMPTY_JOYSTICK = { x: 0, y: 0 }
 
 // Совпадает с defaultPosition/CAR_SCALE в MapProps.tsx (Car1Model/
 // Car2Model) - намеренное дублирование мировых координат, тот же приём,
@@ -19,6 +21,26 @@ const CAR_DEFAULTS: Record<string, { position: [number, number, number]; scale: 
   car1: { position: [-20, 0.0479, 0], scale: 3 },
   car2: { position: [-8, 0.013, 12], scale: 3 },
 }
+
+// car1.glb смоделирована длинной стороной вдоль X (bbox: -2.341..2.235
+// по X, всего -0.976..0.976 по Z - "капот" смотрит вдоль X), а вся эта
+// логика движения считает "вперёд" вдоль Z при yaw=0 (car2.glb как раз
+// так и смоделирована - длинная сторона по Z, без всякого доворота).
+// Без этой компенсации car1 физически ехала вперёд (по Z), но развёрнута
+// была боком к направлению движения - "едет боком" по отзыву клиента.
+// car2 компенсации не требует.
+const CAR_VISUAL_YAW_OFFSET: Record<string, number> = {
+  car1: Math.PI / 2,
+  car2: 0,
+}
+
+// Мир (DesertGround, GameWorld.tsx) - плоская площадка 280x280 с
+// коллайдером ТОЛЬКО в этих границах. Раньше машину ничего не
+// останавливало у края - уехав достаточно далеко и выйдя там, игрок
+// оказывался вне коллайдера земли и падал в пустоту ("падает за
+// текстуры" по отзыву клиента). Небольшой отступ от 140 (реальный край)
+// - чтобы машина разворачивалась, не долетая до самой границы визуально.
+const WORLD_BOUND = 130
 
 function carRestPosition(id: string): [number, number, number] {
   return useCraftStore.getState().overrides[id]?.position ?? CAR_DEFAULTS[id].position
@@ -95,11 +117,13 @@ const TURN_SPEED = 1.5
 
 // Простое аркадное вождение (не настоящая физика колёс/подвески) -
 // накапливаемая скорость (быстрее разгон при более долгом удержании
-// вперёд/свайпа вверх, как и просил клиент) + поворот масштабируется по
-// направлению движения (задом — руль работает зеркально, как в жизни).
-// Читает те же источники ввода, что и обычная ходьба/God Mode
-// (PlayerCharacter.tsx): клавиатура ИЛИ свайп - один и тот же жест
-// "вперёд" работает одинаково во всех трёх режимах.
+// газа) + поворот масштабируется по направлению движения (задом — руль
+// работает зеркально, как в жизни). На телефоне читает отдельный
+// джойстик "drive" (GameMode.tsx, ecctrl/input) - по просьбе клиента
+// управление машиной тоже должно быть джойстиком: вверх/вниз - газ и
+// торможение/задний ход, влево/вправо - руль, ПРОПОРЦИОНАЛЬНО отклонению
+// стика (лёгкий наклон - плавный поворот, стик до упора - максимальный),
+// а не просто вкл/выкл, как было бы у обычных кнопок.
 export function DrivingCar() {
   const drivingId = useDriveStore((s) => s.drivingId)
   const { scene: car1Scene } = useGLTF(car1Url)
@@ -126,9 +150,9 @@ export function DrivingCar() {
   useFrame((_, delta) => {
     if (!drivingId || !groupRef.current) return
     const keys = getKeys()
-    const swipe = useSwipeControlStore.getState()
-    const forward = keys.forward || swipe.forward
-    const backward = keys.backward || swipe.backward
+    const driveJoystick = useJoystickStore.getState().joysticks.drive ?? EMPTY_JOYSTICK
+    const forward = keys.forward || driveJoystick.y > 0.2
+    const backward = keys.backward || driveJoystick.y < -0.2
 
     if (forward) {
       speedRef.current = Math.min(MAX_SPEED, speedRef.current + ACCEL * delta)
@@ -140,13 +164,23 @@ export function DrivingCar() {
       speedRef.current = Math.min(0, speedRef.current + BRAKE * delta)
     }
 
-    const turnInput = (keys.leftward || swipe.leftward ? 1 : 0) - (keys.rightward || swipe.rightward ? 1 : 0)
+    // Клавиатура - вкл/выкл (-1/0/1), джойстик - плавно пропорционально
+    // отклонению стика (небольшая мёртвая зона 0.15, чтобы дрожание
+    // пальца у центра не вызывало едва заметный самопроизвольный увод).
+    const keyboardTurn = (keys.leftward ? 1 : 0) - (keys.rightward ? 1 : 0)
+    const joystickTurn = Math.abs(driveJoystick.x) > 0.15 ? -driveJoystick.x : 0
+    const turnInput = keyboardTurn !== 0 ? keyboardTurn : joystickTurn
     if (Math.abs(speedRef.current) > 0.1) {
       yawRef.current += turnInput * TURN_SPEED * delta * Math.sign(speedRef.current)
     }
 
     posRef.current.x += Math.sin(yawRef.current) * speedRef.current * delta
     posRef.current.z += Math.cos(yawRef.current) * speedRef.current * delta
+    // Не даём уехать за пределы коллайдера земли (DesertGround,
+    // GameWorld.tsx, 280x280) - иначе выход из машины там же роняет
+    // игрока в пустоту, см. комментарий у WORLD_BOUND выше.
+    posRef.current.x = THREE.MathUtils.clamp(posRef.current.x, -WORLD_BOUND, WORLD_BOUND)
+    posRef.current.z = THREE.MathUtils.clamp(posRef.current.z, -WORLD_BOUND, WORLD_BOUND)
 
     groupRef.current.position.copy(posRef.current)
     groupRef.current.rotation.y = yawRef.current
@@ -162,6 +196,7 @@ export function DrivingCar() {
   if (!drivingId) return null
   const scene = drivingId === 'car1' ? car1Scene : car2Scene
   const scale = CAR_DEFAULTS[drivingId]?.scale ?? 1
+  const visualYawOffset = CAR_VISUAL_YAW_OFFSET[drivingId] ?? 0
 
   return (
     <group ref={groupRef}>
@@ -170,7 +205,7 @@ export function DrivingCar() {
           размонтирована) и "за рулём" здесь; один Object3D не может быть
           ребёнком в двух местах разом (тот же приём и по той же причине,
           что у Portal.tsx с двумя порталами на одну модель). */}
-      <Clone object={scene} scale={scale} />
+      <Clone object={scene} scale={scale} rotation={[0, visualYawOffset, 0]} />
     </group>
   )
 }
