@@ -3,13 +3,12 @@ import { Canvas } from '@react-three/fiber'
 import { KeyboardControls, Html } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
-import { VirtualButton, Joystick } from 'ecctrl/input'
+import { VirtualButton } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
-import { vibrate } from '@/utils/haptics'
 import { CraftModeController } from './CraftModeController'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
@@ -27,6 +26,7 @@ import { useQuestStore } from '@/utils/questStore'
 import { GameDebugTracker, GameDebugHUD } from './GameDebugHUD'
 import { Minimap, MinimapTracker } from './Minimap'
 import { SpaceZone, SPACE_TELEPORT_TARGET, SPACE_RETURN_PORTAL_POSITION } from './SpaceZone'
+import { SwipeControls } from './SwipeControls'
 import { TeleportEffect } from './TeleportEffect'
 import { GameLoadingScreen } from './GameLoadingScreen'
 import { CarEntryTrigger, DrivingCar, performCarInteraction } from './CarDriving'
@@ -193,10 +193,7 @@ export function GameMode() {
       </div>
 
       <button
-        onClick={() => {
-          vibrate()
-          setLogOpen(!isLogOpen)
-        }}
+        onClick={() => setLogOpen(!isLogOpen)}
         style={{
           position: 'absolute',
           top: `calc(${edgeInset} + env(safe-area-inset-top))`,
@@ -218,10 +215,7 @@ export function GameMode() {
       </button>
 
       <button
-        onClick={() => {
-          vibrate()
-          toggleGodMode()
-        }}
+        onClick={toggleGodMode}
         style={{
           position: 'absolute',
           top: `calc(${edgeInset} + env(safe-area-inset-top))`,
@@ -244,10 +238,7 @@ export function GameMode() {
       </button>
 
       <button
-        onClick={() => {
-          vibrate()
-          setGameActive(false)
-        }}
+        onClick={() => setGameActive(false)}
         style={{
           position: 'absolute',
           top: `calc(${edgeInset} + env(safe-area-inset-top))`,
@@ -268,76 +259,16 @@ export function GameMode() {
         Выход
       </button>
 
-      {/* Тач-управление ходьбой - настоящий аналоговый джойстик
-          (ecctrl/input), а не свайп по всему экрану: по отзыву клиента
-          "ходит только влево/вправо/вперёд, куда тыкнул туда и пошёл" -
-          прежний свайп (SwipeControls.tsx, удалён) определял только ОДНО
-          доминирующее направление на весь жест, диагональ или "вперёд и
-          чуть в сторону" были невозможны. Джойстик отдаёт непрерывный
-          x/y (см. PlayerCharacter.tsx, movement.joystick) - можно вести
-          пальцем в любую сторону, как и попросили. Скрыт за рулём -
-          там своё, отдельное управление (см. ниже). Круглая кнопка
-          прыжка убрана целиком по более раннему отзыву клиента - прыжок
-          по Space остаётся доступен на десктопе, не требуется ни для
-          одного квеста, так что на мобильном это не блокирует прохождение. */}
-      {isMobile && !drivingId && (
-        <Joystick
-          id="move"
-          joystickWrapperStyle={{
-            bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-            left: `calc(1.5rem + env(safe-area-inset-left))`,
-            top: 'auto',
-            right: 'auto',
-            zIndex: 1001,
-          }}
-          joystickBaseStyle={{ background: 'rgba(10, 17, 32, 0.55)', border: '2px solid rgba(95, 212, 255, 0.6)' }}
-          joystickKnobStyle={{ background: 'rgba(95, 212, 255, 0.85)' }}
-        />
-      )}
-      {/* Управление машиной на телефоне - раньше тоже было свайпом, по
-          отзыву клиента "едет только вперёд, боком, свайпом управлять
-          неудобно". Видимые кнопки вместо жеста: газ слева (можно
-          удерживать одновременно с поворотом - двумя разными пальцами,
-          чего свайп одним жестом никогда не позволял), поворот справа. */}
-      {isMobile && drivingId && (
-        <>
-          <VirtualButton
-            id="gas"
-            label="Газ"
-            buttonWrapperStyle={{
-              bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-              left: `calc(1.5rem + env(safe-area-inset-left))`,
-              top: 'auto',
-              right: 'auto',
-              zIndex: 1001,
-              width: '84px',
-              height: '84px',
-            }}
-          />
-          <VirtualButton
-            id="turnLeft"
-            label="◀"
-            buttonWrapperStyle={{
-              bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-              right: `calc(1.5rem + 76px + env(safe-area-inset-right))`,
-              left: 'auto',
-              top: 'auto',
-              zIndex: 1001,
-            }}
-          />
-          <VirtualButton
-            id="turnRight"
-            label="▶"
-            buttonWrapperStyle={{
-              bottom: `calc(1.5rem + env(safe-area-inset-bottom))`,
-              right: `calc(1.5rem + env(safe-area-inset-right))`,
-              left: 'auto',
-              top: 'auto',
-              zIndex: 1001,
-            }}
-          />
-        </>
-      )}
+      {/* Тач-управление: весь экран - направленный свайп (см.
+          SwipeControls.tsx) вместо джойстика ecctrl/input - по просьбе
+          клиента ("свайп вверх - вперёд" и т.д.), не требует попадать
+          пальцем в конкретную область экрана. Круглая кнопка прыжка
+          (ecctrl/input VirtualButton) убрана целиком по просьбе клиента
+          ("убрать значок прыжка, круглый") - прыжок по Space остаётся
+          доступен на десктопе через KEYBOARD_MAP как раньше; прыжок не
+          требуется ни для одного квеста, так что на мобильном это не
+          блокирует прохождение. */}
+      <SwipeControls />
       {/* Кнопка "Вниз" - только в God Mode (в обычном режиме спуска нет и
           клавиша Ctrl/C тоже ничего не делает, см. PlayerCharacter.tsx),
           и только на мобильном - той же причине, что и "Прыжок" выше. */}
@@ -361,10 +292,7 @@ export function GameMode() {
           только когда есть что сделать - рядом с машиной или уже за рулём. */}
       {(nearCarId || drivingId) && (
         <button
-          onClick={() => {
-            vibrate()
-            performCarInteraction((drivingId ?? nearCarId)!, ecctrlRef)
-          }}
+          onClick={() => performCarInteraction((drivingId ?? nearCarId)!, ecctrlRef)}
           style={{
             position: 'absolute',
             bottom: `calc(${edgeInset} + 5rem + env(safe-area-inset-bottom))`,

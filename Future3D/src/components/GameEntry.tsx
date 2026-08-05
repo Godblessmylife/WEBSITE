@@ -4,7 +4,6 @@ import { useGLTF, OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { useInView } from '@/hooks/useInView'
-import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import computerModelUrl from '../models/computer.glb'
 
 // Клик по START раньше запускал ОДНОВРЕМЕННО: скачивание ~2.2 МБ (gzip)
@@ -191,7 +190,6 @@ export function GameEntry() {
   // последняя на странице, и раньше её Canvas всё равно жил с первой
   // секунды загрузки, хотя пользователь может вообще не долистать сюда).
   const [sectionRef, inView] = useInView<HTMLElement>()
-  const isMobile = useIsMobileViewport()
   usePrefetchGame()
 
   return (
@@ -210,26 +208,15 @@ export function GameEntry() {
           WebGL-контекст на мобильном (см. подробности в JourneyScene.tsx,
           тот же клиентский баг "вылетает от малейшего лага"). */}
       {!isGameActive && inView && (
-        // БАГ (по отзыву клиента: "доскроллив до конца, обратно вверх не
-        // скроллится - застревает на 3D-модели где START"): дело было не
-        // только в touchAction/OrbitControls - у самого R3F есть
-        // собственный обработчик тач-событий для раскаста в 3D (клик по
-        // StartPlate ниже), и он вызывает preventDefault на touchmove
-        // независимо от touchAction в CSS (это подсказка ДЛЯ БРАУЗЕРА,
-        // но явный preventDefault в непассивном обработчике её
-        // перебивает) - на телефоне канвас растянут на весь экран
-        // (последняя секция), увести палец мимо него при скролле снизу
-        // вверх было физически невозможно. На мобильном канвас теперь
-        // ПОЛНОСТЬЮ выключен из хит-теста (pointerEvents:'none') - раз
-        // там и так нет мыши, чтобы навести курсор и покрутить модель,
-        // вращение (OrbitControls) там всё равно ничего не даёт. Тап по
-        // START теперь ловит обычный DOM-div поверх канваса (см. ниже) -
-        // обычный клик не мешает скроллу (в отличие от драга), а сам
-        // канвас с этого момента для тач-событий как будто не существует.
-        <Canvas
-          camera={{ position: [0, 2.1, 4.3], fov: 45 }}
-          style={{ touchAction: isMobile ? 'pan-y' : 'none', pointerEvents: isMobile ? 'none' : 'auto' }}
-        >
+        // touchAction: 'none' — иначе на телефоне жест вращения камеры
+        // (OrbitControls) конкурирует со скроллом страницы через тот же
+        // палец на канвасе.
+        // Камера придвинута ближе к компьютеру по просьбе клиента
+        // ("приблизь") - была [0, 2.4, 5.8], теперь плашка START и
+        // монитор сразу заполняют кадр без лишнего пустого пространства
+        // вокруг. maxDistance у OrbitControls ниже тоже уменьшен, чтобы
+        // зум колёсиком не мог отдалить обратно к старому дальнему кадру.
+        <Canvas camera={{ position: [0, 2.1, 4.3], fov: 45 }} style={{ touchAction: 'none' }}>
           {/* тот же "игровое меню" фон, что и под карточками портфолио */}
           <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
           <fog attach="fog" args={['#0a1120', 10, 30]} />
@@ -246,7 +233,6 @@ export function GameEntry() {
           <StartPlate onActivate={() => setGameActive(true)} />
 
           <OrbitControls
-            enabled={!isMobile}
             target={[0, 1.5, 0]}
             enablePan={false}
             minDistance={2}
@@ -255,21 +241,6 @@ export function GameEntry() {
             maxPolarAngle={Math.PI / 1.7}
           />
         </Canvas>
-      )}
-      {/* Тап "куда угодно" в этой секции запускает игру - раз канвас на
-          мобильном больше не ловит тач (см. комментарий выше), а сама
-          3D-надпись START в нём визуально всё равно по центру, попасть
-          пальцем точно НА неё через невидимый канвас всё равно не
-          получилось бы. Обычный клик (без сдвига пальца) не блокирует
-          скролл - блокирует только drag, так что жест "провести пальцем
-          вверх/вниз, чтобы проскроллить" продолжает работать как обычно. */}
-      {!isGameActive && inView && isMobile && (
-        <div
-          onClick={() => setGameActive(true)}
-          style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}
-          aria-label="Начать игру"
-          role="button"
-        />
       )}
     </section>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
@@ -132,44 +132,6 @@ export function ParticleHeading() {
   const pointsRef = useRef<THREE.Points>(null!)
   const materialRef = useRef<THREE.PointsMaterial>(null!)
 
-  // БАГ (по отзыву клиента: "стоит отпустить палец, буквы сразу встают
-  // на место - сейчас после отпускания держит на какой-то из букв,
-  // словно палец зажат"): на мыши state.pointer (R3F) непрерывно
-  // обновляется движением САМОЙ мыши - убрал курсор, он естественно
-  // "уехал" с текста. На тач-экране такого нет: после отрыва пальца
-  // pointermove больше не приходит вообще, и state.pointer молча
-  // застревает на последних координатах прикосновения НАВСЕГДА - для
-  // пальца эффект выглядит так, будто он всё ещё лежит на экране. Ниже
-  // - для touch-устройств (`pointer: coarse`) явно отслеживаем, идёт ли
-  // касание ПРЯМО СЕЙЧАС, и считаем курсор "далеко" всё остальное время,
-  // а не доверяем последней известной точке. На мыши (`pointer: fine`)
-  // поведение не меняется - там и так всё работает от движения курсора.
-  const isCoarsePointer = useMemo(
-    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
-    [],
-  )
-  const touchActiveRef = useRef(false)
-
-  useEffect(() => {
-    if (!isCoarsePointer) return
-    const setActive = () => {
-      touchActiveRef.current = true
-    }
-    const setInactive = () => {
-      touchActiveRef.current = false
-    }
-    window.addEventListener('pointerdown', setActive)
-    window.addEventListener('pointermove', setActive)
-    window.addEventListener('pointerup', setInactive)
-    window.addEventListener('pointercancel', setInactive)
-    return () => {
-      window.removeEventListener('pointerdown', setActive)
-      window.removeEventListener('pointermove', setActive)
-      window.removeEventListener('pointerup', setInactive)
-      window.removeEventListener('pointercancel', setInactive)
-    }
-  }, [isCoarsePointer])
-
   const homePositions = useMemo(() => sampleTextParticles(), [])
   // current - реальный, мутируемый каждый кадр буфер позиций частиц
   // (то, что уходит в BufferGeometry); homePositions - неизменные
@@ -211,10 +173,7 @@ export function ParticleHeading() {
     const camera = state.camera as THREE.PerspectiveCamera
     const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov) / 2
     const visibleHalfWidth = Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
-    // 0.84 -> 0.96: по отзыву клиента "очень маленькая получилось на
-    // мобильном" - подгонка под ширину экрана и так уже не даёт вылезти
-    // за края, отдельный запас "на всякий случай" можно почти убрать.
-    const fitScale = Math.min(1, (visibleHalfWidth * 0.96) / WORLD_WIDTH)
+    const fitScale = Math.min(1, (visibleHalfWidth * 0.84) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
     // масштаба родительского Object3D (sizeAttenuation считает размер
@@ -233,7 +192,7 @@ export function ParticleHeading() {
     plane.setFromNormalAndCoplanarPoint(planeNormal, groupRef.current.position)
     raycaster.setFromCamera(state.pointer, state.camera)
     const hit = raycaster.ray.intersectPlane(plane, worldHit)
-    if (hit && (!isCoarsePointer || touchActiveRef.current)) {
+    if (hit) {
       groupRef.current.worldToLocal(localHit.copy(worldHit))
     } else {
       localHit.set(9999, 9999, 0)
