@@ -3,12 +3,11 @@ import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useKeyboardControls } from '@react-three/drei'
 import { Ecctrl, type EcctrlHandle } from 'ecctrl'
-import { useButtonStore } from 'ecctrl/input'
+import { useButtonStore, useJoystickStore } from 'ecctrl/input'
 import { useCustomGravity } from 'ecctrl/gravity'
 import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
-import { useSwipeControlStore } from '@/utils/swipeControlStore'
 import heroModelUrl from '../models/hero.glb'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
@@ -83,24 +82,30 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     // ходить телом, которое в этот момент невидимо стоит внутри машины.
     const isDriving = !!useDriveStore.getState().drivingId
     const keys = getKeys()
-    const swipe = useSwipeControlStore.getState()
     const jumpButton = useButtonStore.getState().buttons.jump
+    // Тач-джойстик (GameMode.tsx) - непрерывный x/y, а не 4 фиксированных
+    // направления, как у прежнего свайпа (SwipeControls, удалён по
+    // отзыву клиента "ходит только влево/вправо/вперёд"). ecctrl сам
+    // складывает movement.joystick с forward/backward/leftward/rightward
+    // (см. движок ecctrl) - клавиатурные булевы поля здесь оставлены
+    // только для десктопа (на мобильном keys всегда false, конфликта нет).
+    const moveJoystick = useJoystickStore.getState().joysticks.move ?? EMPTY_JOYSTICK
 
     // В God Mode/за рулём Ecctrl не должен пытаться сам ходить/прыгать/
     // поворачивать персонажа обычным способом — передаём ему "все клавиши
-    // отпущены", а не читаем свайп/jump, иначе несколько систем управления
-    // телом будут конкурировать одновременно.
+    // отпущены", а не читаем джойстик/jump, иначе несколько систем
+    // управления телом будут конкурировать одновременно.
     handle.setMovement(
       godMode || isDriving
         ? EMPTY_MOVEMENT
         : {
-            forward: keys.forward || swipe.forward,
-            backward: keys.backward || swipe.backward,
-            leftward: keys.leftward || swipe.leftward,
-            rightward: keys.rightward || swipe.rightward,
+            forward: keys.forward,
+            backward: keys.backward,
+            leftward: keys.leftward,
+            rightward: keys.rightward,
             run: keys.run,
             jump: keys.jump || !!jumpButton,
-            joystick: EMPTY_JOYSTICK,
+            joystick: { x: moveJoystick.x, y: moveJoystick.y },
           },
     )
 
@@ -169,20 +174,23 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     // (клавиатура). На телефоне физической клавиатуры нет, поэтому в
     // God Mode все клавиши всегда "отпущены" и полёт не реагировал вообще
     // ни на что — выглядело так, будто тач-управление перестало работать
-    // (на самом деле оно и не подключалось к этой ветке). Свайп (обычное
-    // движение) и кнопка "Прыжок"/"Вниз" (ecctrl/input, GameMode.tsx)
-    // теперь читаются наравне с клавиатурой, как и в обычном режиме выше.
+    // (на самом деле оно и не подключалось к этой ветке). Джойстик
+    // (обычное движение) и кнопка "Прыжок"/"Вниз" (ecctrl/input,
+    // GameMode.tsx) теперь читаются наравне с клавиатурой, как и в
+    // обычном режиме выше. Порог 0.3 - джойстик редко стоит РОВНО в
+    // нуле после отпускания пальца (дребезг в пару процентов), нужен
+    // явный наклон, а не любое отклонение от центра.
     const keys = getKeys()
-    const swipe = useSwipeControlStore.getState()
+    const moveJoystick = useJoystickStore.getState().joysticks.move ?? EMPTY_JOYSTICK
     const jumpButton = useButtonStore.getState().buttons.jump
     const descendButton = useButtonStore.getState().buttons.descend
 
-    if (keys.leftward || swipe.leftward) yawRef.current += GOD_YAW_SPEED * delta
-    if (keys.rightward || swipe.rightward) yawRef.current -= GOD_YAW_SPEED * delta
+    if (keys.leftward || moveJoystick.x < -0.3) yawRef.current += GOD_YAW_SPEED * delta
+    if (keys.rightward || moveJoystick.x > 0.3) yawRef.current -= GOD_YAW_SPEED * delta
 
     let thrust = 0
-    if (keys.forward || swipe.forward) thrust += 1
-    if (keys.backward || swipe.backward) thrust -= 1
+    if (keys.forward || moveJoystick.y > 0.3) thrust += 1
+    if (keys.backward || moveJoystick.y < -0.3) thrust -= 1
 
     flightMoveDir.set(Math.sin(yawRef.current) * thrust, 0, Math.cos(yawRef.current) * thrust)
     if (keys.jump || jumpButton) flightMoveDir.y += 1

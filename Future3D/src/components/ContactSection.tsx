@@ -2,8 +2,12 @@ import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import { SectionStarfield } from './SectionStarfield'
 
 const TELEGRAM_HANDLE = 'web3elchapo'
+const CONTACT_EMAIL = 'masterofscience1993@gmail.com'
+const WHATSAPP_NUMBER = '18296057621'
 
 const TELEGRAM_URL = `https://t.me/${TELEGRAM_HANDLE}`
+const MAILTO_URL = `mailto:${CONTACT_EMAIL}`
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`
 
 // Заменён на LiquidButton (shadcn-стиль, Tailwind) по запросу клиента.
 //
@@ -54,6 +58,79 @@ function TelegramButton() {
       <TelegramIcon />
       Написать в Telegram
     </LiquidButton>
+  )
+}
+
+// Простой конверт - почта тут запасной канал связи, не главный (Telegram
+// уже оформлен ярче/крупнее), поэтому без брендовой обводки/свечения.
+function EmailIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.5 6 12 12.5 20.5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function EmailButton() {
+  return (
+    <LiquidButton
+      size="xl"
+      className="rounded-full border border-white/20 text-[#eafcff]"
+      style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em', fontSize: '0.95rem' }}
+      onClick={() => {
+        window.location.href = MAILTO_URL
+      }}
+    >
+      <EmailIcon />
+      {CONTACT_EMAIL}
+    </LiquidButton>
+  )
+}
+
+// Фирменный зелёный WhatsApp - та же логика цвета/обводки, что у
+// Telegram (свой брендовый оттенок отличает кнопку от прочих на сайте).
+function WhatsAppIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="16" fill="#25D366" />
+      <path
+        fill="#fff"
+        d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.3c-5.86 0-10.63 4.77-10.63 10.63 0 1.87.49 3.7 1.42 5.31L5.3 26.7l5.6-1.47a10.6 10.6 0 0 0 5.11 1.3h.01c5.86 0 10.63-4.77 10.63-10.63a10.57 10.57 0 0 0-3.18-7.38Zm-7.45 16.35h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.34.88.89-3.25-.21-.33a8.83 8.83 0 0 1-1.35-4.72c0-4.88 3.97-8.85 8.85-8.85a8.8 8.8 0 0 1 6.26 2.6 8.8 8.8 0 0 1 2.59 6.26c0 4.88-3.97 8.83-8.86 8.83Zm4.85-6.62c-.27-.13-1.58-.78-1.82-.87-.24-.09-.42-.13-.6.13-.18.27-.69.87-.85 1.05-.16.18-.31.2-.58.07-.27-.13-1.13-.42-2.15-1.33-.8-.71-1.33-1.58-1.49-1.85-.16-.27-.02-.42.12-.55.12-.12.27-.31.4-.47.13-.16.18-.27.27-.45.09-.18.04-.34-.02-.47-.07-.13-.6-1.45-.82-1.98-.22-.52-.44-.45-.6-.46h-.51c-.18 0-.47.07-.71.34-.24.27-.94.92-.94 2.24s.96 2.6 1.1 2.78c.13.18 1.9 2.9 4.6 4.06.64.28 1.14.44 1.53.57.64.2 1.23.17 1.69.11.52-.08 1.58-.65 1.8-1.27.22-.63.22-1.16.16-1.27-.07-.11-.24-.18-.51-.31Z"
+      />
+    </svg>
+  )
+}
+
+function WhatsAppButton() {
+  return (
+    <LiquidButton
+      size="xl"
+      className="rounded-full border border-[#25D366]/50 text-[#eafcff] shadow-[0_0_28px_rgba(37,211,102,0.35)] hover:shadow-[0_0_42px_rgba(37,211,102,0.55)]"
+      style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}
+      onClick={() => window.open(WHATSAPP_URL, '_blank', 'noopener,noreferrer')}
+    >
+      <WhatsAppIcon />
+      Написать в WhatsApp
+    </LiquidButton>
+  )
+}
+
+// QR ведёт на ту же ссылку, что и кнопка выше - готовое изображение
+// (public/whatsapp-qr.png), а не сгенерированное в браузере: QR-код
+// строится специализированной библиотекой (правильная коррекция ошибок
+// и т.д.), тащить это в рантайм сайта ради одной картинки в футере не
+// нужно. Логотип WhatsApp по центру проверен - код остаётся читаемым
+// (error correction level H, с запасом на перекрытый центр).
+function WhatsAppQr() {
+  return (
+    <img
+      src="/whatsapp-qr.png"
+      alt="QR-код для перехода в WhatsApp"
+      width={200}
+      height={246}
+      style={{ width: '200px', height: 'auto', borderRadius: '16px' }}
+    />
   )
 }
 
@@ -115,8 +192,22 @@ export function ContactSection() {
       >
         Опишите задачу в Telegram — отвечаю быстро, без менеджеров и лишней переписки.
       </p>
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem',
+        }}
+      >
         <TelegramButton />
+        <WhatsAppButton />
+        <EmailButton />
+        <div style={{ marginTop: '0.75rem' }}>
+          <WhatsAppQr />
+        </div>
       </div>
     </section>
   )
