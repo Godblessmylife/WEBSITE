@@ -1,6 +1,6 @@
 import { Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { KeyboardControls, Html } from '@react-three/drei'
+import { KeyboardControls, Html, useProgress } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
 import { VirtualButton, Joystick } from 'ecctrl/input'
@@ -86,6 +86,17 @@ export function GameMode() {
   // смысла и не должно ничего блокировать).
   const needsRotate = isTouch && isPortrait
 
+  // По отзыву клиента: джойстик/кнопки были доступны ещё ДО того, как
+  // догрузились все .glb модели (Suspense внутри Canvas это учитывает,
+  // а DOM-оверлей снаружи Canvas - нет, он монтируется сразу вместе с
+  // GameMode). Тап по джойстику в этот момент ничего не ломал напрямую
+  // (Ecctrl ещё не смонтирован, читать нечего), но ощущался как "игра
+  // дёргается/виснет" в первые секунды. useProgress - обычный zustand-стор
+  // поверх общего THREE.DefaultLoadingManager, не завязан на Canvas -
+  // безопасно читать здесь же, снаружи. round(...) в GameLoadingScreen -
+  // drei иногда отдаёт 99.997% и это никогда не станет 100 без округления.
+  const isLoaded = useProgress((s) => Math.round(s.progress) >= 100 && !s.active)
+
   // Компактные размеры HUD-кнопок на телефоне (по просьбе клиента) —
   // отступ между ними ("9rem"/"8rem" в calc() ниже) тоже уменьшен,
   // иначе при меньшей ширине самих кнопок между ними осталась бы
@@ -128,6 +139,28 @@ export function GameMode() {
         dpr={reduced ? [1, 1.5] : [1, 2]}
         shadows={!reduced}
         onPointerMissed={handleCanvasPointerMissed}
+        onCreated={({ gl }) => {
+          // По отзыву клиента "во время движения зависает и выкидывает из
+          // игры" - на телефонах с ограниченной памятью WebGL-контекст
+          // может "потеряться" под нагрузкой (десятки .glb + WASM-физика
+          // одновременно). Без preventDefault() браузер даже не пытается
+          // восстановить контекст - канвас остаётся НАВСЕГДА чёрным/
+          // замороженным, именно то, что описал клиент. С preventDefault()
+          // контекст чаще всего восстанавливается сам за доли секунды -
+          // если нет, через 3с чище выйти в меню (тот же setGameActive,
+          // что и кнопка "Выход"), чем оставлять мёртвый канвас.
+          const canvas = gl.domElement
+          let restoreTimeout: number | undefined
+          canvas.addEventListener('webglcontextlost', (event) => {
+            event.preventDefault()
+            console.error('[GameMode] WebGL context lost - ожидаем восстановления')
+            restoreTimeout = window.setTimeout(() => setGameActive(false), 3000)
+          })
+          canvas.addEventListener('webglcontextrestored', () => {
+            console.warn('[GameMode] WebGL context restored')
+            window.clearTimeout(restoreTimeout)
+          })
+        }}
       >
         <AdaptivePerformance />
         <color attach="background" args={['#0a1120']} />
@@ -183,73 +216,84 @@ export function GameMode() {
         <CraftModeController />
       </Canvas>
 
-      <div
-        style={{
-          position: 'absolute',
-          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
-          left: `calc(${edgeInset} + env(safe-area-inset-left))`,
-          padding: btnPadding,
-          minHeight: btnMinHeight,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          background: 'rgba(10, 17, 32, 0.6)',
-          border: '1px solid rgba(255, 215, 106, 0.6)',
-          borderRadius: '999px',
-          color: '#ffe9b0',
-          fontFamily: "'Orbitron', sans-serif",
-          fontSize: btnFontSize,
-          zIndex: 1001,
-        }}
-      >
-        <span aria-hidden="true">✦</span>
-        {score}
-      </div>
+      {/* Пока не догрузились все модели/физика - показываем ТУ ЖЕ красивую
+          шкалу загрузки, что и Suspense внутри Canvas (см. useProgress
+          выше), а не сразу боевой HUD с джойстиком. Кнопка "Выход" ниже
+          остаётся доступна даже сейчас - чтобы не запереть человека на
+          экране загрузки, если что-то зависнет в сети. */}
+      {!isLoaded && <GameLoadingScreen />}
 
-      <button
-        onClick={() => setLogOpen(!isLogOpen)}
-        style={{
-          position: 'absolute',
-          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
-          left: `calc(${edgeInset} + ${btnGap} + env(safe-area-inset-left))`,
-          padding: btnPadding,
-          minHeight: btnMinHeight,
-          background: 'rgba(10, 17, 32, 0.6)',
-          border: '1px solid rgba(255, 215, 106, 0.6)',
-          borderRadius: '999px',
-          color: '#ffe9b0',
-          fontFamily: "'Orbitron', sans-serif",
-          fontSize: btnFontSize,
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-          zIndex: 1001,
-        }}
-      >
-        Квесты
-      </button>
+      {isLoaded && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+              left: `calc(${edgeInset} + env(safe-area-inset-left))`,
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(255, 215, 106, 0.6)',
+              borderRadius: '999px',
+              color: '#ffe9b0',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              zIndex: 1001,
+            }}
+          >
+            <span aria-hidden="true">✦</span>
+            {score}
+          </div>
 
-      <button
-        onClick={toggleGodMode}
-        style={{
-          position: 'absolute',
-          top: `calc(${edgeInset} + env(safe-area-inset-top))`,
-          right: `calc(${edgeInset} + ${btnGapRight} + env(safe-area-inset-right))`,
-          padding: btnPadding,
-          minHeight: btnMinHeight,
-          background: godModeActive ? 'rgba(147, 92, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
-          border: '1px solid rgba(147, 92, 255, 0.8)',
-          borderRadius: '999px',
-          color: godModeActive ? '#0c0518' : '#d7c3ff',
-          fontFamily: "'Orbitron', sans-serif",
-          fontSize: btnFontSize,
-          fontWeight: godModeActive ? 700 : 400,
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-          zIndex: 1001,
-        }}
-      >
-        God Mode
-      </button>
+          <button
+            onClick={() => setLogOpen(!isLogOpen)}
+            style={{
+              position: 'absolute',
+              top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+              left: `calc(${edgeInset} + ${btnGap} + env(safe-area-inset-left))`,
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(255, 215, 106, 0.6)',
+              borderRadius: '999px',
+              color: '#ffe9b0',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              zIndex: 1001,
+            }}
+          >
+            Квесты
+          </button>
+
+          <button
+            onClick={toggleGodMode}
+            style={{
+              position: 'absolute',
+              top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+              right: `calc(${edgeInset} + ${btnGapRight} + env(safe-area-inset-right))`,
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: godModeActive ? 'rgba(147, 92, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(147, 92, 255, 0.8)',
+              borderRadius: '999px',
+              color: godModeActive ? '#0c0518' : '#d7c3ff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              fontWeight: godModeActive ? 700 : 400,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+              zIndex: 1001,
+            }}
+          >
+            God Mode
+          </button>
+        </>
+      )}
 
       <button
         onClick={() => setGameActive(false)}
@@ -285,7 +329,7 @@ export function GameMode() {
           клиента - прыжок по Space остаётся доступен на десктопе, не
           требуется ни для одного квеста, так что на мобильном это не
           блокирует прохождение. */}
-      {isTouch && !drivingId && !needsRotate && (
+      {isLoaded && isTouch && !drivingId && !needsRotate && (
         <Joystick
           id="move"
           joystickWrapperStyle={{
@@ -302,7 +346,7 @@ export function GameMode() {
       {/* Управление машиной на телефоне - тоже джойстик, по просьбе
           клиента: вверх/вниз - газ/торможение и задний ход, влево/вправо
           - руль, плавно пропорционально наклону стика (см. CarDriving.tsx). */}
-      {isTouch && drivingId && !needsRotate && (
+      {isLoaded && isTouch && drivingId && !needsRotate && (
         <Joystick
           id="drive"
           joystickWrapperStyle={{
@@ -322,7 +366,7 @@ export function GameMode() {
           (isMobile проверяет ШИРИНУ окна, а не тип указателя - в landscape
           телефон обычно шире 640px, кнопка пропала бы именно тогда, когда
           нужна). */}
-      {isTouch && godModeActive && !needsRotate && (
+      {isLoaded && isTouch && godModeActive && !needsRotate && (
         <VirtualButton
           id="descend"
           label="Вниз"
@@ -340,7 +384,7 @@ export function GameMode() {
           (KEYBOARD_MAP выше), но на телефоне физической клавиатуры нет,
           поэтому нужен видимый триггер того же действия. Показывается
           только когда есть что сделать - рядом с машиной или уже за рулём. */}
-      {(nearCarId || drivingId) && (
+      {isLoaded && (nearCarId || drivingId) && (
         <button
           onClick={() => performCarInteraction((drivingId ?? nearCarId)!, ecctrlRef)}
           style={{
@@ -366,15 +410,19 @@ export function GameMode() {
         </button>
       )}
 
-      {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована
-          до конца. Убрать (или спрятать за флагом), когда перестанет
-          быть нужен. */}
-      <GameDebugHUD />
-      <Minimap />
+      {isLoaded && (
+        <>
+          {/* Отладочный HUD — по просьбе клиента, пока игра не отполирована
+              до конца. Убрать (или спрятать за флагом), когда перестанет
+              быть нужен. */}
+          <GameDebugHUD />
+          <Minimap />
 
-      <QuestLog />
-      <QuestDialogue />
-      <TeleportEffect />
+          <QuestLog />
+          <QuestDialogue />
+          <TeleportEffect />
+        </>
+      )}
 
       {/* Поверх всего остального - блокирует и джойстики, и HUD, пока
           телефон в портретной ориентации (см. комментарий у needsRotate

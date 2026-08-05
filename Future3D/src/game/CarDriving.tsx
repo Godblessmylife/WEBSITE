@@ -11,6 +11,13 @@ import car1Url from '../models/Car1.glb'
 import car2Url from '../models/car2.glb'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
+// Переиспользуемый temp-вектор для проверки расстояния до машины (тот же
+// приём, что и в GameCamera.tsx/Bonuses.tsx) - раньше CarEntryTrigger
+// создавал новый THREE.Vector3 КАЖДЫЙ кадр на КАЖДУЮ машину (сейчас их
+// две - car1/car2), лишняя нагрузка на сборщик мусора ровно в тот момент,
+// когда игрок ходит рядом с машинами - тот же класс проблем, что и общий
+// отзыв клиента "при движении подвисает".
+const tempCarPos = new THREE.Vector3()
 
 // Совпадает с defaultPosition/CAR_SCALE в MapProps.tsx (Car1Model/
 // Car2Model) - намеренное дублирование мировых координат, тот же приём,
@@ -74,7 +81,7 @@ export function performCarInteraction(id: string, ecctrlRef: RefObject<EcctrlHan
 
   if (drivingId || !handle) return
   const [px, py, pz] = carRestPosition(id)
-  if (handle.currPos.distanceTo(new THREE.Vector3(px, py, pz)) < ENTER_DISTANCE) {
+  if (handle.currPos.distanceTo(tempCarPos.set(px, py, pz)) < ENTER_DISTANCE) {
     useDriveStore.getState().enter(id)
   }
 }
@@ -94,7 +101,7 @@ export function CarEntryTrigger({ id, ecctrlRef }: { id: string; ecctrlRef: RefO
     const handle = ecctrlRef.current
     if (drivingId !== id && handle) {
       const [px, py, pz] = carRestPosition(id)
-      const isNear = !drivingId && handle.currPos.distanceTo(new THREE.Vector3(px, py, pz)) < ENTER_DISTANCE
+      const isNear = !drivingId && handle.currPos.distanceTo(tempCarPos.set(px, py, pz)) < ENTER_DISTANCE
       useDriveStore.getState().setNear(id, isNear)
     }
 

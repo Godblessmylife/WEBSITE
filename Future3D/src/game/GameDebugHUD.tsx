@@ -63,23 +63,31 @@ export function GameDebugHUD() {
     <div
       style={{
         position: 'absolute',
-        bottom: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-bottom))`,
-        left: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-left))`,
-        // По просьбе клиента окно вдвое компактнее на мобильном: padding
-        // и maxWidth уменьшены примерно в 2 раза от прежних мобильных
-        // значений, fontSize/lineHeight уменьшены чуть меньше (иначе текст
-        // стал бы нечитаемым на маленьком экране).
-        padding: isMobile ? '0.2rem 0.35rem' : '0.75rem 1rem',
+        // Раньше стояло bottom-left - там же, где пеший/автомобильный
+        // джойстик (GameMode.tsx) - на телефоне окно накладывалось прямо
+        // на стик (отзыв клиента). Top-left под кнопками счёта/квестов тоже
+        // не подошёл - при высоте панели в 3-4 строки её нижний край всё
+        // равно задевал верх джойстика (замерено автотестом: bottom панели
+        // 196px против top джойстика 166px на 844x390). Top-RIGHT, под
+        // God Mode/Выход - единственное место без конкурентов вообще: не
+        // джойстик (bottom-left), не миникарта/кнопки "Вниз"/"Сесть"
+        // (bottom-right/center).
+        top: `calc(${isMobile ? '0.75rem' : '1.5rem'} + ${isMobile ? '2.1rem' : '2.75rem'} + 0.5rem + env(safe-area-inset-top))`,
+        right: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-right))`,
+        // По просьбе клиента окно ещё компактнее на мобильном: padding
+        // и maxWidth уменьшены, fontSize/lineHeight уменьшены чуть меньше
+        // (иначе текст стал бы нечитаемым на маленьком экране).
+        padding: isMobile ? '0.15rem 0.3rem' : '0.75rem 1rem',
         background: 'rgba(5, 7, 13, 0.75)',
         border: '1px solid rgba(255, 255, 255, 0.15)',
         borderRadius: isMobile ? '6px' : '12px',
         color: '#9db2c9',
         fontFamily: 'monospace',
-        fontSize: isMobile ? '0.45rem' : '0.75rem',
-        lineHeight: isMobile ? 1.3 : 1.5,
+        fontSize: isMobile ? '0.4rem' : '0.75rem',
+        lineHeight: isMobile ? 1.25 : 1.5,
         zIndex: 1001,
         pointerEvents: 'none',
-        maxWidth: isMobile ? '105px' : '320px',
+        maxWidth: isMobile ? '90px' : '320px',
       }}
     >
       <div style={{ color: '#5fd4ff' }}>DEBUG</div>

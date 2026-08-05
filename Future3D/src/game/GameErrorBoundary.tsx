@@ -23,6 +23,15 @@ export class GameErrorBoundary extends Component<Props, State> {
     return { error }
   }
 
+  // Раньше ошибка нигде не логировалась - ни в консоль, ни на экран,
+  // только тихо переключала на этот фоллбек. Если клиент сообщает
+  // "игра вылетает", а в консоль ничего не попало, диагностировать
+  // нечего. componentDidCatch - единственное место в React, где доступен
+  // ещё и componentStack (в какой момент рендера всё упало).
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error('[GameErrorBoundary]', error, info.componentStack)
+  }
+
   // Раньше единственным выходом отсюда была кнопка "Выход" — целиком
   // размонтировать игру и возвращаться на START заново. Часто помогает
   // просто попробовать смонтировать игру ЕЩЁ РАЗ на месте: сама ошибка
@@ -59,6 +68,21 @@ export class GameErrorBoundary extends Component<Props, State> {
           }}
         >
           <span>Не удалось запустить игру. Попробуйте ещё раз.</span>
+          {/* Текст ошибки прямо на экране - раньше был виден только в
+              консоли браузера (чаще всего недоступной обычному
+              посетителю), сообщить о проблеме без этого было почти
+              невозможно ("не работает" без деталей). */}
+          <span
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              color: '#9db2c9',
+              maxWidth: '480px',
+              wordBreak: 'break-word',
+            }}
+          >
+            {this.state.error?.message}
+          </span>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={this.handleRetry}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useProgress } from '@react-three/drei'
 
 // Раньше оба Suspense (загрузка JS-чанка игры в App.tsx и загрузка
 // моделей hero.glb/portal.glb внутри GameMode) использовали
@@ -35,6 +36,13 @@ export function GameLoadingScreen() {
   // жизненный цикл экрана, а не новая случайная раскладка на каждый
   // ре-рендер (React может ре-рендерить fallback чаще одного раза).
   const streaks = useMemo(() => createStreaks(), [])
+  // useProgress - обычный zustand-стор поверх THREE.DefaultLoadingManager,
+  // не требует Canvas/R3F-контекста - работает одинаково что здесь (внутри
+  // Html внутри Canvas), что в App.tsx (снаружи Canvas, для самого JS-чанка
+  // игры). По отзыву клиента вместо бесконечной анимации нужна настоящая
+  // шкала загрузки - progress округляем сами, drei иногда отдаёт дробные
+  // значения вроде 99.997.
+  const progress = useProgress((s) => Math.round(s.progress))
 
   return (
     <div
@@ -84,6 +92,48 @@ export function GameLoadingScreen() {
         <div className="warp-ring warp-ring-outer" />
         <div className="warp-ring warp-ring-inner" />
         <div className="warp-core" />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.1rem',
+            fontWeight: 700,
+            color: '#05070d',
+            textShadow: '0 0 6px rgba(255, 255, 255, 0.6)',
+          }}
+        >
+          {progress}%
+        </div>
+      </div>
+
+      {/* Настоящая шкала загрузки (по отзыву клиента) поверх прежней
+          бесконечной анимации - drei useProgress считает её по реальным
+          загруженным/всего байтам через THREE.DefaultLoadingManager, а не
+          имитирует. */}
+      <div
+        style={{
+          width: '220px',
+          height: '6px',
+          borderRadius: '999px',
+          background: 'rgba(95, 212, 255, 0.15)',
+          border: '1px solid rgba(95, 212, 255, 0.35)',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            width: `${progress}%`,
+            height: '100%',
+            borderRadius: '999px',
+            background: 'linear-gradient(90deg, #5fd4ff, #eafcff)',
+            boxShadow: '0 0 10px rgba(95, 212, 255, 0.8)',
+            transition: 'width 0.25s ease-out',
+          }}
+        />
       </div>
 
       <div style={{ textAlign: 'center', position: 'relative' }}>
