@@ -3,9 +3,12 @@ import { SectionStarfield } from './SectionStarfield'
 
 const TELEGRAM_HANDLE = 'web3elchapo'
 const WHATSAPP_NUMBER = '18296057621'
+const PHONE_NUMBER = '+79256106936'
+const PHONE_DISPLAY = '+7 925 610-69-36'
 
 const TELEGRAM_URL = `https://t.me/${TELEGRAM_HANDLE}`
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`
+const PHONE_URL = `tel:${PHONE_NUMBER}`
 
 // Заменён на LiquidButton (shadcn-стиль, Tailwind) по запросу клиента.
 //
@@ -157,6 +160,24 @@ export function ContactSection() {
       >
         <TelegramButton />
         <WhatsAppButton />
+        {/* Номер телефона текстом, отдельно от кнопок-мессенджеров - по
+            просьбе клиента, тем же фирменным шрифтом заголовков сайта.
+            Настоящая <a href="tel:">, а не просто текст - на мобильном
+            тап сразу открывает номеронабиратель. */}
+        <a
+          href={PHONE_URL}
+          style={{
+            marginTop: '0.5rem',
+            fontFamily: "'Orbitron', sans-serif",
+            fontSize: '1.15rem',
+            letterSpacing: '0.08em',
+            color: '#eafcff',
+            textDecoration: 'none',
+            textShadow: '0 0 18px rgba(95, 212, 255, 0.45)',
+          }}
+        >
+          {PHONE_DISPLAY}
+        </a>
       </div>
     </section>
   )

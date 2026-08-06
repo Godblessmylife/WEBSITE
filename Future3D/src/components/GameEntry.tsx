@@ -4,6 +4,7 @@ import { useGLTF, OrbitControls, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { useInView } from '@/hooks/useInView'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import computerModelUrl from '../models/computer.glb'
 
 // Клик по START раньше запускал ОДНОВРЕМЕННО: скачивание ~2.2 МБ (gzip)
@@ -86,15 +87,26 @@ function createStartTexture() {
 const COMPUTER_SCALE = 2
 const PLATE_Y = 2.6
 
+// Камера здесь висит на ФИКСИРОВАННЫХ позиции/FOV (не зависит от aspect
+// ratio, в отличие от ParticleHeading.tsx/SkyZone.tsx на основном
+// путешествии) - на узком мобильном экране та же мировая ширина плашки
+// занимает заметно БОЛЬШУЮ долю кадра, чем на широком десктопном (отзыв
+// клиента "надпись START очень большая на моб. устройствах"). Простое
+// фиксированное уменьшение на мобильном, без пересчёта под каждый aspect -
+// плашка декоративная, ей не нужна точность до пикселя, как заголовку.
+const MOBILE_PLATE_SCALE = 0.72
+
 function StartPlate({ onActivate }: { onActivate: () => void }) {
   const texture = useMemo(() => createStartTexture(), [])
   const groupRef = useRef<THREE.Group>(null!)
   const [hovered, setHovered] = useState(false)
+  const isMobile = useIsMobileViewport()
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     groupRef.current.position.y = PLATE_Y + Math.sin(t * 1.4) * 0.08
-    const scale = hovered ? 1.15 : 1
+    const baseScale = isMobile ? MOBILE_PLATE_SCALE : 1
+    const scale = (hovered ? 1.15 : 1) * baseScale
     groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, scale, 0.15))
   })
 

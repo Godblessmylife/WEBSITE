@@ -7,6 +7,8 @@ import { VirtualButton } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
 import { usePerfStore } from '@/utils/perfStore'
+import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
+import { GraphicsSettingsButton } from './GraphicsSettingsButton'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { CraftModeController } from './CraftModeController'
@@ -42,6 +44,17 @@ const DESERT_PORTAL_POSITION = new THREE.Vector3(10, 0, -10)
 // радиус срабатывания портала туда.
 const DESERT_RETURN_TARGET = new THREE.Vector3(0, 2, 0)
 
+// Разрешение рендера по выбранному в настройках (шестерёнка, см.
+// GraphicsSettingsButton.tsx) качеству - "низкое" совпадает с тем, что
+// раньше было принудительно для ЛЮБОГО тач-устройства (см. комментарий
+// в perfStore.ts), теперь это осознанный выбор владельца слабого
+// телефона, а не автоматика по типу указателя.
+const DPR_BY_QUALITY: Record<'high' | 'medium' | 'low', [number, number] | number> = {
+  high: [1, 2],
+  medium: [1, 1.5],
+  low: 1,
+}
+
 const KEYBOARD_MAP = [
   { name: 'forward', keys: ['ArrowUp', 'KeyW'] },
   { name: 'backward', keys: ['ArrowDown', 'KeyS'] },
@@ -67,6 +80,7 @@ export function GameMode() {
   const score = useGameStore((s) => s.score)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
   const reduced = usePerfStore((s) => s.reduced)
+  const quality = useGraphicsQualityStore((s) => s.quality)
   const setLogOpen = useQuestStore((s) => s.setLogOpen)
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
   const godModeActive = useGodModeStore((s) => s.active)
@@ -171,15 +185,16 @@ export function GameMode() {
       <Canvas
         key={canvasKey}
         camera={{ fov: 60, near: 0.1, far: 300 }}
-        // На тач-устройствах фиксированный dpr=1 (без ретина-суперсэмплинга)
-        // вместо "до 1.5x" - по отзыву клиента именно на телефоне (после
-        // поворота экрана, когда весь фреймбуфер перевыделяется под новый
-        // размер) чаще всего происходит потеря WebGL-контекста, а лишние
-        // 1.5x/2x пикселей на кадр - самый большой и самый легко устранимый
-        // потребитель GPU-памяти из всего рендера. На десктопе (мышь,
-        // обычно куда больше видеопамяти) ретина по-прежнему включена.
-        dpr={isTouch ? 1 : reduced ? [1, 1.5] : [1, 2]}
-        shadows={!reduced}
+        // reduced (живой fps действительно проседает, AdaptivePerformance)
+        // всегда переопределяет ручной выбор качества вниз до минимума -
+        // это подстраховка от реального зависания, а не человеческий
+        // выбор; пока живой fps в порядке, разрешение берётся из
+        // graphicsQualityStore (кнопка-шестерёнка, дефолт "высокое" для
+        // всех устройств - см. подробности в perfStore.ts/
+        // graphicsQualityStore.ts про отказ от автоматического урезания
+        // всех тач-устройств).
+        dpr={reduced ? 1 : DPR_BY_QUALITY[quality]}
+        shadows={quality !== 'low' && !reduced}
         onPointerMissed={handleCanvasPointerMissed}
         onCreated={({ gl }) => {
           gl.domElement.addEventListener('webglcontextlost', (event) => {
@@ -341,6 +356,18 @@ export function GameMode() {
           >
             God Mode
           </button>
+
+          {/* Шестерёнка настроек графики - по центру сверху: единственное
+              свободное место в верхнем ряду (слева Счёт+Квесты, справа
+              God Mode+Выход - см. их calc() офсеты выше, трогать которые
+              ради ещё одной кнопки было бы лишним риском). */}
+          <GraphicsSettingsButton
+            style={{
+              top: `calc(${edgeInset} + env(safe-area-inset-top))`,
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          />
         </>
       )}
 
