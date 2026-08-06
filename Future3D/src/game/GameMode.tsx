@@ -6,7 +6,7 @@ import { type EcctrlHandle } from 'ecctrl'
 import { VirtualButton } from 'ecctrl/input'
 import * as THREE from 'three'
 import { useGameStore } from '@/utils/gameStore'
-import { usePerfStore } from '@/utils/perfStore'
+import { useGamePerfStore } from '@/utils/gamePerfStore'
 import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
 import { GraphicsSettingsButton } from './GraphicsSettingsButton'
 import { useGodModeStore } from '@/utils/godModeStore'
@@ -79,7 +79,14 @@ export function GameMode() {
   const setGameActive = useGameStore((s) => s.setGameActive)
   const score = useGameStore((s) => s.score)
   const ecctrlRef = useRef<EcctrlHandle>(null!)
-  const reduced = usePerfStore((s) => s.reduced)
+  // Отдельный от лендинга стор (gamePerfStore.ts, не perfStore.ts) - см.
+  // подробный комментарий там про то, почему их пришлось разделить: у
+  // игры своя настройка качества (graphicsQualityStore.ts + шестерёнка),
+  // и понижение по одному лишь признаку touch-устройства через ОБЩИЙ
+  // стор с лендингом там не нужно (и однажды уже сломало сам лендинг,
+  // когда его убрали не в том месте).
+  const reduced = useGamePerfStore((s) => s.reduced)
+  const setReduced = useGamePerfStore((s) => s.setReduced)
   const quality = useGraphicsQualityStore((s) => s.quality)
   const setLogOpen = useQuestStore((s) => s.setLogOpen)
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
@@ -178,8 +185,8 @@ export function GameMode() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
       {/* Тени (shadow map + рендер каждого объекта в него ещё раз)
-          отключены при reduced (тач-устройство/мало ядер CPU ИЛИ живой
-          fps в игре просел — см. utils/perfStore.ts + AdaptivePerformance)
+          отключены при reduced (мало ядер CPU ИЛИ живой fps в игре
+          просел — см. utils/gamePerfStore.ts + AdaptivePerformance)
           — одна из самых дорогих фич рендера, а тут всего одна DesertSun
           с castShadow, так что без теней мир не станет менее читаемым. */}
       <Canvas
@@ -190,9 +197,8 @@ export function GameMode() {
         // это подстраховка от реального зависания, а не человеческий
         // выбор; пока живой fps в порядке, разрешение берётся из
         // graphicsQualityStore (кнопка-шестерёнка, дефолт "высокое" для
-        // всех устройств - см. подробности в perfStore.ts/
-        // graphicsQualityStore.ts про отказ от автоматического урезания
-        // всех тач-устройств).
+        // всех устройств - см. подробности в gamePerfStore.ts про то,
+        // почему у игры СВОЙ отдельный стор, а не общий с лендингом).
         dpr={reduced ? 1 : DPR_BY_QUALITY[quality]}
         shadows={quality !== 'low' && !reduced}
         onPointerMissed={handleCanvasPointerMissed}
@@ -226,7 +232,7 @@ export function GameMode() {
           })
         }}
       >
-        <AdaptivePerformance />
+        <AdaptivePerformance setReduced={setReduced} />
         <color attach="background" args={['#0a1120']} />
         {/* far поднят с 70 до 170 вместе с увеличением площадки
             (GameWorld: 140->280) — гора (MapProps: Mountain, ~90-130

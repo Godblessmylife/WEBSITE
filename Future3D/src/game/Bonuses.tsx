@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
 import { useGameStore } from '@/utils/gameStore'
-import { usePerfStore } from '@/utils/perfStore'
+import { useGamePerfStore } from '@/utils/gamePerfStore'
 
 const COLLECT_DISTANCE = 1.4
 const SCORE_PER_BONUS = 10
@@ -119,7 +119,7 @@ const LIT_BONUS_COUNT = 8
 
 export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   const addScore = useGameStore((s) => s.addScore)
-  const reduced = usePerfStore((s) => s.reduced)
+  const reduced = useGamePerfStore((s) => s.reduced)
   const [collected, setCollected] = useState<boolean[]>(() => BONUS_POSITIONS.map(() => false))
   const collectedRef = useRef(collected)
   collectedRef.current = collected

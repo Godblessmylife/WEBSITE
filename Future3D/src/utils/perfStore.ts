@@ -1,27 +1,24 @@
 import { create } from 'zustand'
 
-// РАНЬШЕ стартовая эвристика включала "reduced" для ЛЮБОГО touch-
-// устройства - по отзыву клиента это оказалось слишком грубо ("раньше
-// графика была крутая, сейчас ни о чём"): наличие тачскрина само по себе
-// ничего не говорит о мощности GPU (современный флагманский телефон
-// часто быстрее старого ПК с мышкой). Осознанный выбор владельца слабого
-// устройства теперь живёт в graphicsQualityStore.ts (кнопка-шестерёнка в
-// игре) - там дефолт "высокое" для всех, а не автоматическое понижение
-// по признаку touch. Здесь остаётся только "мало ядер CPU" (грубый, но
-// дешёвый признак объективно слабой машины, доступный до первого кадра,
-// не зависящий от типа устройства ввода) - и то как временный сигнал:
-// динамическая подстройка по РЕАЛЬНОМУ fps через AdaptivePerformance
-// (drei PerformanceMonitor) в каждом Canvas переключает reduced, если
-// кадры проседают по факту, независимо от того, что показала эвристика
-// на старте.
+// Стартовая эвристика для ЛЕНДИНГА (JourneyScene/PortfolioCarousel/
+// Effects/Ufos - ВСЯ основная 3D-сцена сайта, не игра). НЕ путать с
+// gamePerfStore.ts - игра нарочно использует ОТДЕЛЬНЫЙ стор с другим
+// дефолтом (см. подробный комментарий там про то, почему объединять их
+// оказалось ошибкой: touch ИЛИ мало ядер CPU - грубый, но дешёвый признак
+// слабой машины, доступный до первого кадра, плюс динамическая подстройка
+// по РЕАЛЬНОМУ fps через AdaptivePerformance (drei PerformanceMonitor) в
+// каждом Canvas - если жизнь показывает, что кадры проседают, "reduced"
+// включается, даже если по эвристике устройство выглядело мощным, и
+// наоборот.
 function detectInitialReduced(): boolean {
   if (typeof window === 'undefined') return false
-  return (
+  const isTouch = window.matchMedia('(pointer: coarse)').matches
+  const weakCpu =
     typeof navigator !== 'undefined' &&
     typeof navigator.hardwareConcurrency === 'number' &&
     navigator.hardwareConcurrency > 0 &&
     navigator.hardwareConcurrency <= 4
-  )
+  return isTouch || weakCpu
 }
 
 interface PerfState {

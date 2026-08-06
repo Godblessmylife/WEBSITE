@@ -25,6 +25,7 @@ export function JourneyScene() {
   // (touch/мало ядер CPU) — ещё и по реальному fps через
   // AdaptivePerformance ниже.
   const reduced = usePerfStore((s) => s.reduced)
+  const setReduced = usePerfStore((s) => s.setReduced)
 
   // По жалобе клиента: игра на мобильных вылетала от малейшего лага,
   // особенно рядом с бонусами/на резких поворотах - то есть именно там,
@@ -52,7 +53,7 @@ export function JourneyScene() {
       dpr={reduced ? [1, 1.5] : [1, 2]}
       style={{ width: '100%', height: '100%', display: 'block' }}
     >
-      <AdaptivePerformance />
+      <AdaptivePerformance setReduced={setReduced} />
       <CameraRig />
       <FogController />
       <SceneLighting />
