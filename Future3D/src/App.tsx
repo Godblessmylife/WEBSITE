@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import '@fontsource/orbitron/700.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/600.css'
+import '@fontsource/russo-one/cyrillic-400.css'
 import { useLenis } from '@/hooks/useLenis'
 import { JourneyScene } from '@/scenes/JourneyScene'
 import { Nav } from '@/components/Nav'
@@ -12,6 +13,7 @@ import { PricingSection } from '@/components/PricingSection'
 import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
 import { GameLoadingScreen } from '@/game/GameLoadingScreen'
+import { JourneyLoadingScreen } from '@/scenes/JourneyLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
 import { JourneyTaglines } from '@/components/JourneyTaglines'
@@ -51,10 +53,13 @@ export function App() {
               модели молча, без единого визуального признака (отзыв клиента
               "чёрный экран, если подождать 5-10 минут - всё грузится") -
               никакой ошибки тут и не было, просто загрузка была невидимой.
-              Тот же экран загрузки, что уже проверен для игры (с реальным
-              процентом через useProgress) - хотя бы видно, что происходит,
-              а не гадать "сломано или просто долго". */}
-          <Suspense fallback={<GameLoadingScreen />}>
+              Свой экран загрузки (JourneyLoadingScreen.tsx), не тот же,
+              что у игры - по отзыву клиента "у игры и у страницы
+              загрузка одинаковая" - тема "орбиты вокруг солнца"
+              соответствует тому, что реально грузится (солнечная
+              система), а не переиспользованный игровой "варп". Тот же
+              реальный процент через useProgress в обоих. */}
+          <Suspense fallback={<JourneyLoadingScreen />}>
             <JourneyScene />
           </Suspense>
           <StratosphereFlash />

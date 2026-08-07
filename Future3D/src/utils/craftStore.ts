@@ -26,6 +26,35 @@ import { create } from 'zustand'
 // браузере (постоянная для всех посетителей раскладка by-design требует
 // прислать координаты разработчику вручную).
 const STORAGE_KEY = 'future3d-craft-overrides'
+const MOVE_MODE_STORAGE_KEY = 'future3d-move-mode-enabled'
+
+// Режим "перемещение объектов" - выключен по умолчанию. По отзыву
+// клиента: невидимая зона джойстика (DynamicJoystick.tsx, GameMode.tsx)
+// занимает большую часть экрана на телефоне и перехватывает касания
+// РАНЬШЕ, чем они доходят до хитбоксов объектов под ней - поэтому
+// "тыкнуть по модели, чтобы переместить" перестало работать на мобильном,
+// как только появился джойстик. Одновременно оба способа управления
+// касанием работать не могут (тот же палец не может одновременно значить
+// "веди персонажа" и "укажи на объект") - явный переключатель в
+// настройках (GraphicsSettingsButton.tsx) отдаёт приоритет одному из
+// двух: выключено (по умолчанию) - работает джойстик, включено -
+// джойстик не рисуется вообще, касания снова доходят до объектов.
+function loadMoveModeEnabled(): boolean {
+  try {
+    return localStorage.getItem(MOVE_MODE_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveMoveModeEnabled(enabled: boolean) {
+  try {
+    localStorage.setItem(MOVE_MODE_STORAGE_KEY, enabled ? '1' : '0')
+  } catch {
+    // localStorage недоступен - переключатель просто не переживёт
+    // перезагрузку страницы, не повод падать с ошибкой.
+  }
+}
 
 export interface ObjectOverride {
   position: [number, number, number]
@@ -74,16 +103,19 @@ interface CraftState {
   movingId: string | null
   movingOriginalY: number | null
   overrides: Record<string, ObjectOverride>
+  moveModeEnabled: boolean
   startMoving: (id: string, y: number) => void
   place: (id: string, position: [number, number, number]) => void
   cancelMoving: () => void
   setScale: (id: string, defaultPosition: [number, number, number], scale: number) => void
+  setMoveModeEnabled: (enabled: boolean) => void
 }
 
 export const useCraftStore = create<CraftState>((set) => ({
   movingId: null,
   movingOriginalY: null,
   overrides: loadOverrides(),
+  moveModeEnabled: loadMoveModeEnabled(),
   // Не подхватывает второй объект, пока первый ещё не поставлен -
   // одновременно двигать можно только что-то одно.
   startMoving: (id, y) => set((s) => (s.movingId ? {} : { movingId: id, movingOriginalY: y })),
@@ -103,6 +135,10 @@ export const useCraftStore = create<CraftState>((set) => ({
       saveOverrides(overrides)
       return { overrides }
     }),
+  setMoveModeEnabled: (enabled) => {
+    saveMoveModeEnabled(enabled)
+    set({ moveModeEnabled: enabled })
+  },
 }))
 
 // Живая точка на земле, куда сейчас смотрит курсор - отдельный vanilla-

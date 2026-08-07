@@ -31,6 +31,28 @@ const SAMPLE_STEP = 6
 const WORLD_WIDTH = 7.4
 const BASE_POINT_SIZE = 0.09
 
+// По отзыву клиента "надпись маленькая, найти шрифт побольше и красивее" -
+// Russo One (@fontsource/russo-one, подключен в App.tsx) - готовый
+// футуристичный шрифт именно с кириллицей (не Orbitron - у него нет
+// кириллических глифов вообще, латиница-only, браузер молча подменял бы
+// буквы дефолтным шрифтом - см. тот же вывод у остальных кириллических
+// заголовков сайта). document.fonts.check - именно ПРОВЕРКА, а не
+// ожидание загрузки: рой частиц считается один раз при монтировании
+// (useMemo), и если шрифт КОНКРЕТНО В ЭТОТ МОМЕНТ ещё не догрузился,
+// откат на старый проверенный Arial безопаснее, чем ждать/усложнять
+// компонент - к моменту, когда пользователь долистает до этого места
+// путешествия, маленький файл шрифта (в отличие от моделей на несколько
+// МБ, за которыми и так ждёт Suspense в App.tsx) почти наверняка уже
+// готов.
+function pickHeadingFont(): string {
+  try {
+    if (document.fonts?.check('900 32px "Russo One"')) return '"Russo One", Arial, sans-serif'
+  } catch {
+    // document.fonts недоступен в каком-то браузере - используем Arial.
+  }
+  return 'Arial, sans-serif'
+}
+
 function sampleTextParticles(): Float32Array {
   const canvas = document.createElement('canvas')
   canvas.width = CANVAS_W
@@ -41,21 +63,18 @@ function sampleTextParticles(): Float32Array {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
+  const fontFamily = pickHeadingFont()
   // Размер шрифта подгоняется под фактическую ширину текста, а не задан
   // фиксированным числом: на фиксированных 108px "РАЗРАБОТКА ВЕБ-САЙТОВ"
   // (21 символ, жирный шрифт) оказалась ШИРЕ, чем сам canvas - конец
   // строки ("ТОВ") просто не попадал в сэмплируемую область и пропадал
   // (найдено скриншотом при проверке). measureText - на глаз тут
   // угадать ширину без браузера было нельзя.
-  ctx.font = `900 ${BASE_FONT_PX}px Arial, sans-serif`
+  ctx.font = `900 ${BASE_FONT_PX}px ${fontFamily}`
   const measuredWidth = ctx.measureText(TEXT).width
   const maxWidth = CANVAS_W - CANVAS_PADDING * 2
   const fontPx = measuredWidth > maxWidth ? BASE_FONT_PX * (maxWidth / measuredWidth) : BASE_FONT_PX
-  // Обычный жирный системный шрифт, не Orbitron: у Orbitron нет
-  // кириллических глифов (латиница-only), браузер молча подменял бы
-  // буквы дефолтным шрифтом всё равно - см. этот же вывод для остальных
-  // кириллических заголовков сайта (ContactSection и т.д.).
-  ctx.font = `900 ${fontPx}px Arial, sans-serif`
+  ctx.font = `900 ${fontPx}px ${fontFamily}`
   ctx.fillText(TEXT, CANVAS_W / 2, CANVAS_H / 2 + 4)
 
   const { data } = ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)
@@ -173,11 +192,12 @@ export function ParticleHeading() {
     const camera = state.camera as THREE.PerspectiveCamera
     const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov) / 2
     const visibleHalfWidth = Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
-    // 0.84 -> 0.96: по отзыву клиента "очень маленькая получилось на
-    // мобильном, почти не видно" - подгонка под ширину экрана и так уже
-    // не даёт вылезти за края, отдельный запас "на всякий случай" можно
-    // почти убрать.
-    const fitScale = Math.min(1, (visibleHalfWidth * 0.96) / WORLD_WIDTH)
+    // 0.84 -> 0.96 -> 0.99: по повторному отзыву клиента "надпись всё ещё
+    // маленькая, почти на весь экран, но чтобы не заходила за края" -
+    // подгонка под реальную ширину экрана уже сама не даёт вылезти за
+    // края при ЛЮБОМ значении здесь (это и есть весь смысл формулы),
+    // так что запас "на всякий случай" можно снизить почти до нуля.
+    const fitScale = Math.min(1, (visibleHalfWidth * 0.99) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
     // масштаба родительского Object3D (sizeAttenuation считает размер

@@ -102,6 +102,12 @@ export function GameMode() {
   // бы именно в момент, когда игрок поворачивает телефон, чтобы играть.
   const isTouch = useIsTouchDevice()
   const isPortrait = useIsPortrait()
+  // Режим "перемещение объектов" (шестерёнка в GameMode.tsx) - см.
+  // подробный комментарий в craftStore.ts: невидимая зона джойстика
+  // перехватывает касания раньше, чем они доходят до объектов карты,
+  // оба способа управления одним и тем же пальцем разом работать не
+  // могут - явный переключатель отдаёт приоритет одному из двух.
+  const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -414,7 +420,7 @@ export function GameMode() {
           убрана целиком по более раннему отзыву клиента - прыжок по
           Space остаётся доступен на десктопе, не требуется ни для одного
           квеста, так что на мобильном это не блокирует прохождение. */}
-      {isLoaded && isTouch && !drivingId && !needsRotate && (
+      {isLoaded && isTouch && !drivingId && !needsRotate && !moveModeEnabled && (
         <DynamicJoystick
           id="move"
           zoneStyle={{ left: 0, top: '18%', width: '58%', height: '68%', zIndex: 1000 }}
@@ -423,7 +429,7 @@ export function GameMode() {
       {/* Управление машиной на телефоне - тоже джойстик, по просьбе
           клиента: вверх/вниз - газ/торможение и задний ход, влево/вправо
           - руль, плавно пропорционально наклону стика (см. CarDriving.tsx). */}
-      {isLoaded && isTouch && drivingId && !needsRotate && (
+      {isLoaded && isTouch && drivingId && !needsRotate && !moveModeEnabled && (
         <DynamicJoystick
           id="drive"
           zoneStyle={{ left: 0, top: '18%', width: '58%', height: '68%', zIndex: 1000 }}
@@ -453,6 +459,11 @@ export function GameMode() {
           (KEYBOARD_MAP выше), но на телефоне физической клавиатуры нет,
           поэтому нужен видимый триггер того же действия. Показывается
           только когда есть что сделать - рядом с машиной или уже за рулём. */}
+      {/* По отзыву клиента "огромное окно выйти - сделать маленькую кнопку,
+          не надписи огромные" - своя, заметно более компактная разметка
+          вместо переиспользования btnPadding/btnMinHeight/btnFontSize
+          верхнего HUD-ряда. "(ENTER)" убран на тач-устройствах - подсказка
+          про клавишу бессмысленна там, где физической клавиатуры нет. */}
       {isLoaded && (nearCarId || drivingId) && (
         <button
           onClick={() => performCarInteraction((drivingId ?? nearCarId)!, ecctrlRef)}
@@ -461,21 +472,21 @@ export function GameMode() {
             bottom: `calc(${edgeInset} + 5rem + env(safe-area-inset-bottom))`,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: btnPadding,
-            minHeight: btnMinHeight,
+            padding: '0.3rem 0.8rem',
+            minHeight: '1.7rem',
             background: 'rgba(95, 212, 255, 0.85)',
             border: '1px solid #eafcff',
             borderRadius: '999px',
             color: '#04121c',
             fontFamily: "'Orbitron', sans-serif",
             fontWeight: 700,
-            fontSize: btnFontSize,
+            fontSize: '0.7rem',
             cursor: 'pointer',
             touchAction: 'manipulation',
             zIndex: 1001,
           }}
         >
-          {drivingId ? 'Выйти (ENTER)' : 'Сесть (ENTER)'}
+          {drivingId ? (isTouch ? 'Выйти' : 'Выйти (ENTER)') : isTouch ? 'Сесть' : 'Сесть (ENTER)'}
         </button>
       )}
 

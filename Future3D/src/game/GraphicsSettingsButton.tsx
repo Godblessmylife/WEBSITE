@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
 import type { GraphicsQuality } from '@/utils/graphicsQualityStore'
+import { useCraftStore } from '@/utils/craftStore'
 
 const QUALITY_LABELS: Record<GraphicsQuality, string> = {
   high: 'Высокое',
@@ -9,30 +10,51 @@ const QUALITY_LABELS: Record<GraphicsQuality, string> = {
   low: 'Низкое',
 }
 const QUALITY_ORDER: GraphicsQuality[] = ['high', 'medium', 'low']
+const GEAR_TEETH = 8
 
+// Раньше зубцы шестерёнки были одним вручную нарисованным path - на
+// глаз кривым (отзыв клиента "шестерёнка кривая"), скорее всего из-за
+// неточно подобранных координат кривых Безье. Заменено на честно
+// симметричную фигуру: одна и та же короткая линия, повёрнутая на
+// равный угол N раз - кривой геометрически быть не может, зубцы всегда
+// строго одинаковые и равномерные по построению, а не "на глаз".
 function GearIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.4" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M19.4 13.6a1.9 1.9 0 0 0 .38 2.1l.07.07a2.3 2.3 0 1 1-3.25 3.25l-.07-.07a1.9 1.9 0 0 0-2.1-.38 1.9 1.9 0 0 0-1.15 1.74v.2a2.3 2.3 0 0 1-4.6 0v-.1a1.9 1.9 0 0 0-1.24-1.74 1.9 1.9 0 0 0-2.1.38l-.07.07a2.3 2.3 0 1 1-3.25-3.25l.07-.07a1.9 1.9 0 0 0 .38-2.1 1.9 1.9 0 0 0-1.74-1.15h-.2a2.3 2.3 0 0 1 0-4.6h.1a1.9 1.9 0 0 0 1.74-1.24 1.9 1.9 0 0 0-.38-2.1l-.07-.07a2.3 2.3 0 1 1 3.25-3.25l.07.07a1.9 1.9 0 0 0 2.1.38h.1a1.9 1.9 0 0 0 1.15-1.74v-.2a2.3 2.3 0 0 1 4.6 0v.1a1.9 1.9 0 0 0 1.15 1.74 1.9 1.9 0 0 0 2.1-.38l.07-.07a2.3 2.3 0 1 1 3.25 3.25l-.07.07a1.9 1.9 0 0 0-.38 2.1v.1a1.9 1.9 0 0 0 1.74 1.15h.2a2.3 2.3 0 0 1 0 4.6h-.1a1.9 1.9 0 0 0-1.74 1.15Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
+      <g stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+        {Array.from({ length: GEAR_TEETH }, (_, i) => (
+          <line
+            key={i}
+            x1="12"
+            y1="1.8"
+            x2="12"
+            y2="4.6"
+            transform={`rotate(${(360 / GEAR_TEETH) * i} 12 12)`}
+          />
+        ))}
+      </g>
+      <circle cx="12" cy="12" r="7.2" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" />
     </svg>
   )
 }
 
-// Кнопка-шестерёнка с выпадающей панелью "Высокое/Среднее/Низкое" - по
-// отзыву клиента "верни качество игры, если у кого слабый телефон пусть
-// в настройках сделает слабее": дефолт качества теперь высокий для всех
-// (см. graphicsQualityStore.ts), а понижение - осознанный выбор владельца
-// слабого устройства через эту кнопку, а не автоматика по типу устройства.
+// Кнопка-шестерёнка с выпадающей панелью настроек:
+// - Качество графики (Высокое/Среднее/Низкое) - по отзыву клиента "верни
+//   качество игры, если у кого слабый телефон пусть в настройках сделает
+//   слабее": дефолт качества теперь высокий для всех (graphicsQualityStore
+//   .ts), понижение - осознанный выбор владельца слабого устройства.
+// - Режим перемещения объектов - см. подробный комментарий в
+//   craftStore.ts про то, почему это отдельный переключатель, а не
+//   всегда включено: невидимая зона джойстика (DynamicJoystick.tsx)
+//   перехватывает касания раньше, чем они доходят до объектов карты, оба
+//   способа управления касанием одновременно работать не могут.
 export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
   const [open, setOpen] = useState(false)
   const quality = useGraphicsQualityStore((s) => s.quality)
   const setQuality = useGraphicsQualityStore((s) => s.setQuality)
+  const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
+  const setMoveModeEnabled = useCraftStore((s) => s.setMoveModeEnabled)
 
   return (
     <div style={{ position: 'absolute', zIndex: 1001, ...style }}>
@@ -69,7 +91,7 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
             background: 'rgba(10, 17, 32, 0.92)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: '12px',
-            minWidth: '150px',
+            minWidth: '170px',
           }}
         >
           <span
@@ -107,6 +129,42 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
               {QUALITY_LABELS[q]}
             </button>
           ))}
+
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '0.3rem 0' }} />
+
+          <span
+            style={{
+              color: '#9db2c9',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.6rem',
+              letterSpacing: '0.05em',
+              marginBottom: '0.15rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ПЕРЕМЕЩЕНИЕ ОБЪЕКТОВ
+          </span>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.4rem 0.6rem',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={moveModeEnabled}
+              onChange={(e) => setMoveModeEnabled(e.currentTarget.checked)}
+              style={{ width: '1rem', height: '1rem', accentColor: '#5fd4ff', cursor: 'pointer' }}
+            />
+            <span style={{ color: '#eafcff', fontFamily: "'Orbitron', sans-serif", fontSize: '0.68rem' }}>
+              {moveModeEnabled ? 'Включено (без джойстика)' : 'Выключено'}
+            </span>
+          </label>
         </div>
       )}
     </div>

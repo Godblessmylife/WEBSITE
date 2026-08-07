@@ -29,25 +29,39 @@ const HITBOX_CENTER: [number, number, number] = [0, 0.738, -0.155]
 // доступен новый квест (WoW-конвенция), "?" — квест выполнен, готов к
 // сдаче. Обе текстуры генерируются один раз (useMemo), переключение —
 // просто смена видимого спрайта, без пересоздания canvas каждый кадр.
+// По отзыву клиента "сделать больше и чтобы написалось" - холст выше
+// (добавлена строка подписи под символом) и весь спрайт крупнее, чтобы
+// издалека было понятно, что это именно квест, а не просто светящийся
+// значок непонятного назначения.
+const ICON_LABEL: Record<'!' | '?', string> = {
+  '!': 'КВЕСТ',
+  '?': 'СДАТЬ КВЕСТ',
+}
+
 function createIconTexture(symbol: '!' | '?'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
+  canvas.width = 160
+  canvas.height = 200
   const ctx = canvas.getContext('2d')!
 
-  const glow = ctx.createRadialGradient(64, 64, 4, 64, 64, 64)
+  const glow = ctx.createRadialGradient(80, 80, 4, 80, 80, 80)
   glow.addColorStop(0, 'rgba(255, 215, 106, 0.5)')
   glow.addColorStop(1, 'rgba(255, 215, 106, 0)')
   ctx.fillStyle = glow
-  ctx.fillRect(0, 0, 128, 128)
+  ctx.fillRect(0, 0, 160, 160)
 
-  ctx.font = 'bold 88px sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#ffe9b0'
   ctx.shadowColor = '#ffd76a'
-  ctx.shadowBlur = 18
-  ctx.fillText(symbol, 64, 68)
+  ctx.shadowBlur = 20
+
+  ctx.font = 'bold 110px sans-serif'
+  ctx.fillText(symbol, 80, 85)
+
+  ctx.font = 'bold 22px sans-serif'
+  ctx.shadowBlur = 10
+  ctx.fillText(ICON_LABEL[symbol], 80, 178)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
@@ -59,11 +73,11 @@ function QuestMarkerIcon({ symbol }: { symbol: '!' | '?' }) {
   const texture = useMemo(() => createIconTexture(symbol), [symbol])
 
   useFrame(({ clock }) => {
-    spriteRef.current.position.y = 2.25 + Math.sin(clock.elapsedTime * 2.4) * 0.08
+    spriteRef.current.position.y = 2.5 + Math.sin(clock.elapsedTime * 2.4) * 0.08
   })
 
   return (
-    <sprite ref={spriteRef} position={[0, 2.25, 0]} scale={[0.6, 0.6, 0.6]}>
+    <sprite ref={spriteRef} position={[0, 2.5, 0]} scale={[1, 1.25, 1]}>
       <spriteMaterial map={texture} transparent />
     </sprite>
   )

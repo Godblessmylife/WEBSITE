@@ -5,7 +5,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
-import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
+import { useCraftStore, craftGhostStore, MIN_SCALE, MAX_SCALE } from '@/utils/craftStore'
 import { useDriveStore } from '@/utils/driveStore'
 
 // Оборачивает любую постройку MapProps.tsx в "берущийся" объект - БЕЗ
@@ -80,6 +80,29 @@ const scalePercentStyle: CSSProperties = {
   fontSize: '0.68rem',
   minWidth: '2.6rem',
   textAlign: 'center',
+}
+
+// Кнопки +/- рядом со слайдером - по отзыву клиента: на телефоне точно
+// попасть пальцем в нужную точку узкого слайдера сложно, а дискретный
+// шаг кнопкой - нет. Слайдер остаётся (удобен на десктопе с мышью), а
+// кнопки - для точной подстройки одним тапом на любом устройстве.
+const SCALE_STEP = 0.1
+const resizeButtonStyle: CSSProperties = {
+  width: '1.6rem',
+  height: '1.6rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  background: 'rgba(95, 212, 255, 0.15)',
+  border: '1px solid rgba(95, 212, 255, 0.6)',
+  borderRadius: '50%',
+  color: '#eafcff',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: '0.9rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  touchAction: 'manipulation',
 }
 
 export function Grabbable({
@@ -211,6 +234,16 @@ export function Grabbable({
                   Переместить
                 </button>
                 <div style={scaleRowStyle}>
+                  <button
+                    style={resizeButtonStyle}
+                    onClick={() =>
+                      useCraftStore.getState().setScale(id, defaultPosition, scaleMultiplier - SCALE_STEP)
+                    }
+                    disabled={scaleMultiplier <= MIN_SCALE}
+                    aria-label="Уменьшить"
+                  >
+                    −
+                  </button>
                   <input
                     type="range"
                     min={50}
@@ -220,8 +253,18 @@ export function Grabbable({
                     onChange={(e) =>
                       useCraftStore.getState().setScale(id, defaultPosition, Number(e.currentTarget.value) / 100)
                     }
-                    style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '92px' }}
+                    style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '72px' }}
                   />
+                  <button
+                    style={resizeButtonStyle}
+                    onClick={() =>
+                      useCraftStore.getState().setScale(id, defaultPosition, scaleMultiplier + SCALE_STEP)
+                    }
+                    disabled={scaleMultiplier >= MAX_SCALE}
+                    aria-label="Увеличить"
+                  >
+                    +
+                  </button>
                   <span style={scalePercentStyle}>{Math.round(scaleMultiplier * 100)}%</span>
                 </div>
               </div>
