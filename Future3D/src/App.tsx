@@ -9,7 +9,6 @@ import { Nav } from '@/components/Nav'
 import { AboutSection } from '@/components/AboutSection'
 import { PortfolioCarousel } from '@/components/PortfolioCarousel'
 import { PortfolioGallery } from '@/components/PortfolioGallery'
-import { VideoModal } from '@/components/VideoModal'
 import { PricingSection } from '@/components/PricingSection'
 import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
@@ -19,6 +18,7 @@ import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
 import { JourneyTaglines } from '@/components/JourneyTaglines'
 import { ScrollHint } from '@/components/ScrollHint'
+import { JourneyTuner } from '@/components/JourneyTuner'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
@@ -104,11 +104,14 @@ export function App() {
       )}
 
       {isGalleryOpen && <PortfolioGallery />}
-      <VideoModal />
 
-      {/* Тюнер путешествия (шестерёнка в левом нижнем углу) временно
-          убран по просьбе клиента - сам компонент (JourneyTuner.tsx)
-          никуда не делся, просто не рендерится здесь. */}
+      {/* По просьбе клиента: убрана временная диагностическая иконка
+          (DiagnosticOverlay, "!"/"i" в левом нижнем углу - её задача была
+          разово найти причину мобильного бага, актуальность прошла), а
+          на её месте снова тот же тюнер путешествия (шестерёнка), что
+          показывал процент прокрутки раньше - клиент попросил вернуть
+          именно эту кнопку. */}
+      <JourneyTuner />
     </>
   )
 }

@@ -175,6 +175,19 @@ function jfToProgress(jf: number): number {
 
 const SUN_CLOSEST_T = 0.3252 // совпадает с P3
 const DESCENT_START_T = 0.6115 // совпадает с P4
+
+// По отзыву клиента: на самой нулевой точке (progress=0, страница ещё не
+// прокручена) солнечная система была видна "слишком далеко" - camera
+// стояла в P0=(0,60,0), самом начале кривой. Клиент сравнил варианты
+// через тюнер путешествия (JourneyTuner.tsx) и выбрал вид на jf=23% как
+// желаемую СТАРТОВУЮ точку. Вместо сдвига самих 3D-точек пути (что
+// изменило бы форму кривой и весь последующий расчёт пролёта мимо
+// солнца) - переразметка t для сегмента 0..BP1_PROGRESS начинается не с
+// t=0, а с t, который раньше соответствовал jf=23% - тот же t=SUN_CLOSEST_T
+// на BP1_PROGRESS (jf=33%) сохранён, чтобы не трогать уже откалиброванный
+// момент максимального сближения с солнцем и всё, что от него зависит
+// ниже (SOLAR_SYSTEM_LOOKAT_HOLD/END и т.д.).
+const JOURNEY_START_JF = 0.23
 // MAX_DIVE_T = 1.0 (буквально долететь до (0,1.6,0)) — проверено
 // скриншотами — оказался ПЕРЕбором: на дистанции меньше ~5 units от
 // поверхности 4096x2048 текстура Земли не даёт никакой дополнительной
@@ -187,10 +200,15 @@ const MAX_DIVE_T = 0.85
 
 const BP1_PROGRESS = jfToProgress(0.33)
 const BP2_PROGRESS = jfToProgress(0.6)
+// t, который раньше (до сдвига стартовой точки) соответствовал jf=23% -
+// та же линейная формула, что и в первой ветке remapPathProgress ниже,
+// просто вычисленная один раз на модульном уровне для JOURNEY_START_JF.
+const JOURNEY_START_T = (jfToProgress(JOURNEY_START_JF) / BP1_PROGRESS) * SUN_CLOSEST_T
 
 export function remapPathProgress(progress: number, maxReachableProgress: number): number {
   if (progress <= BP1_PROGRESS) {
-    return (progress / BP1_PROGRESS) * SUN_CLOSEST_T
+    const localT = progress / BP1_PROGRESS
+    return JOURNEY_START_T + localT * (SUN_CLOSEST_T - JOURNEY_START_T)
   }
   if (progress <= BP2_PROGRESS) {
     const localT = (progress - BP1_PROGRESS) / (BP2_PROGRESS - BP1_PROGRESS)
