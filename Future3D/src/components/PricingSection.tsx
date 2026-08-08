@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { SectionStarfield } from './SectionStarfield'
-import { useScrollStore } from '@/utils/scrollStore'
-import { LiquidButton } from '@/components/ui/liquid-glass-button'
 
 // Готовая, статическая страница оплаты (Trybit/CryptoCloud, POS-ссылка) -
 // без бэкенда: секретный API-ключ платёжного шлюза НЕ используется нигде
@@ -61,23 +59,24 @@ const TIERS: Tier[] = [
 // убрало бы это. Визуально даёт тот же "зеркальный" эффект без потери
 // текста.
 //
-// Кликабельны: ведут к контактам (#contact) — самое естественное
-// действие после выбора тарифа. Конкретное место назначения не было
-// указано явно, при другом ожидании — легко поменять одну строку.
+// Кликабельны: по явному запросу клиента открывают страницу оплаты
+// (PAYMENT_URL) в новой вкладке — та же ссылка для всех тарифов, т.к.
+// у статической POS-ссылки нет способа заранее подставить сумму
+// конкретного пакета (см. пояснение у PAYMENT_URL выше).
 function TierCard({ tier }: { tier: Tier }) {
   const [hovered, setHovered] = useState(false)
 
-  const goToContact = () => useScrollStore.getState().scrollToElement('#contact')
+  const openPayment = () => window.open(PAYMENT_URL, '_blank', 'noopener,noreferrer')
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={goToContact}
+      onClick={openPayment}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          goToContact()
+          openPayment()
         }
       }}
       onMouseEnter={() => setHovered(true)}
@@ -199,19 +198,9 @@ export function PricingSection() {
           ))}
         </div>
 
-        <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.7rem' }}>
-          <LiquidButton
-            size="xl"
-            className="rounded-full border border-[#5fd4ff]/50 text-[#eafcff] shadow-[0_0_28px_rgba(95,212,255,0.35)] hover:shadow-[0_0_42px_rgba(95,212,255,0.55)]"
-            style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em', fontSize: '0.95rem' }}
-            onClick={() => window.open(PAYMENT_URL, '_blank', 'noopener,noreferrer')}
-          >
-            ОПЛАТИТЬ
-          </LiquidButton>
-          <p style={{ color: '#7d92a8', fontSize: '0.8rem', textAlign: 'center', maxWidth: '420px' }}>
-            Откроется страница оплаты — сумму и детали заказа уточните заранее в чате.
-          </p>
-        </div>
+        <p style={{ marginTop: '1.5rem', color: '#7d92a8', fontSize: '0.8rem', textAlign: 'center' }}>
+          Нажмите на тариф, чтобы перейти к оплате — сумму и детали заказа уточните заранее в чате.
+        </p>
       </div>
     </section>
   )
