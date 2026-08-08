@@ -162,14 +162,19 @@ export function PricingSection() {
     >
       <SectionStarfield />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
+        {/* Крупнее, со свечением - тот же приём, что у "КОНТАКТЫ"
+            (ContactSection.tsx), по просьбе клиента "надпись цены тоже
+            сделать больше". */}
         <p
           style={{
             fontFamily: "'Orbitron', sans-serif",
+            fontWeight: 700,
             color: '#5fd4ff',
-            letterSpacing: '0.2em',
-            fontSize: '0.85rem',
-            marginBottom: '1rem',
+            letterSpacing: '0.18em',
+            fontSize: 'clamp(1.6rem, 4.5vw, 2.6rem)',
+            marginBottom: '1.25rem',
             textAlign: 'center',
+            textShadow: '0 0 22px rgba(95, 212, 255, 0.65), 0 0 48px rgba(95, 212, 255, 0.35)',
           }}
         >
           ЦЕНЫ

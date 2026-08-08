@@ -23,13 +23,21 @@ export function AboutSection() {
     >
       <SectionStarfield />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', width: '100%' }}>
+        {/* По центру и крупнее, со свечением - тот же приём, что у
+            "КОНТАКТЫ"/"ЦЕНЫ", по явной просьбе клиента. Остальной блок
+            (заголовок, текст, карточки услуг) остаётся выровненным по
+            левому краю - клиент просил выделить именно эту надпись, не
+            перестраивать всю секцию. */}
         <p
           style={{
             fontFamily: "'Orbitron', sans-serif",
+            fontWeight: 700,
             color: '#5fd4ff',
-            letterSpacing: '0.2em',
-            fontSize: '0.85rem',
-            marginBottom: '1rem',
+            letterSpacing: '0.18em',
+            fontSize: 'clamp(1.6rem, 4.5vw, 2.6rem)',
+            marginBottom: '1.25rem',
+            textAlign: 'center',
+            textShadow: '0 0 22px rgba(95, 212, 255, 0.65), 0 0 48px rgba(95, 212, 255, 0.35)',
           }}
         >
           О РАЗРАБОТЧИКЕ

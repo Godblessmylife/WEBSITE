@@ -17,8 +17,23 @@ const CARD_RADIUS = 3.4
 interface DragState {
   active: boolean
   lastX: number
+  lastTime: number
   velocity: number
 }
+
+// Скорость, к которой скорость вращения плавно возвращается сама (лёгкое
+// фоновое вращение, когда карусель никто не трогает) - было раньше
+// фиксированным значением, теперь это "дно", ниже которого спиннер не
+// тормозит после свайпа.
+const IDLE_VELOCITY = 0.15
+// Экспоненциальное затухание скорости к IDLE_VELOCITY после отпускания -
+// не зависит от FPS (в отличие от умножения на константу каждый кадр),
+// см. формулу в useFrame ниже. Меньше число - дольше крутится.
+const SPIN_DECAY_RATE = 1.1
+// Защита от аномально большой скорости при коротком дребезге pointer-
+// событий (dt около нуля даёт огромное dx/dt) - иначе резкий свайп мог
+// закрутить карусель на неадекватную скорость на один кадр.
+const MAX_SPIN_VELOCITY = 10
 
 // Двойной клик по карточке — открыть 3D-галерею проектов (см.
 // PortfolioGallery.tsx). stopPropagation не нужен: onDoubleClick — это
@@ -67,6 +82,13 @@ function Carousel({
 
   useFrame((_, delta) => {
     if (!dragRef.current.active) {
+      // По просьбе клиента: свайп задаёт каруселе инерцию, как у спиннера
+      // - резко крутится и постепенно, плавно замедляется, а не сразу
+      // возвращается к тихому фоновому вращению. exp(-rate*delta) -
+      // экспоненциальное затухание РАЗНИЦЫ между текущей скоростью и
+      // "полом" (IDLE_VELOCITY), не зависящее от частоты кадров.
+      dragRef.current.velocity =
+        IDLE_VELOCITY + (dragRef.current.velocity - IDLE_VELOCITY) * Math.exp(-SPIN_DECAY_RATE * delta)
       rotationRef.current += dragRef.current.velocity * delta
     }
     groupRef.current.rotation.y = rotationRef.current
@@ -91,7 +113,7 @@ export function PortfolioCarousel() {
   // мобильном (см. подробности в JourneyScene.tsx).
   const isGameActive = useGameStore((s) => s.isGameActive)
   const isMobile = useIsMobileViewport()
-  const dragRef = useRef<DragState>({ active: false, lastX: 0, velocity: 0.15 })
+  const dragRef = useRef<DragState>({ active: false, lastX: 0, lastTime: 0, velocity: IDLE_VELOCITY })
   const rotationRef = useRef(0)
   // Canvas отложен до приближения к области видимости - см. useInView.ts
   // и общее объяснение проблемы в JourneyScene.tsx (все Canvas-секции
@@ -103,12 +125,25 @@ export function PortfolioCarousel() {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     dragRef.current.active = true
     dragRef.current.lastX = e.clientX
+    dragRef.current.lastTime = performance.now()
   }
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!dragRef.current.active) return
+    const now = performance.now()
     const dx = e.clientX - dragRef.current.lastX
+    // Секунды, не миллисекунды - тот же масштаб времени, что и delta в
+    // useFrame (Carousel), иначе скорость после отпускания оказалась бы
+    // в тысячу раз меньше/больше, чем нужно для формулы затухания там.
+    const dt = Math.max((now - dragRef.current.lastTime) / 1000, 1 / 240)
+    const dRotation = dx * 0.01
+    rotationRef.current += dRotation
+    // Скорость в "радианах в секунду" - последнее значение перед
+    // отпусканием становится начальной скоростью спиннера (см. useFrame
+    // в Carousel: пока active===true эта скорость не используется для
+    // вращения, только запоминается на момент onPointerUp).
+    dragRef.current.velocity = THREE.MathUtils.clamp(dRotation / dt, -MAX_SPIN_VELOCITY, MAX_SPIN_VELOCITY)
     dragRef.current.lastX = e.clientX
-    rotationRef.current += dx * 0.01
+    dragRef.current.lastTime = now
   }
   const onPointerUp = () => {
     dragRef.current.active = false
