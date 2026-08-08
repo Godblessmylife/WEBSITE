@@ -212,7 +212,17 @@ export function ParticleHeading() {
     const visibleWidth = 2 * Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
     // 0.94 от ПОЛНОЙ (не половинной) видимой ширины - реально почти во
     // весь экран, с небольшим запасом, чтобы не касаться самых краёв.
-    const fitScale = Math.min(1, (visibleWidth * 0.94) / WORLD_WIDTH)
+    // На широком (альбомном, десктопном) экране этот предел раньше был
+    // 1 (без верхней границы, кроме самого fitScale) - visibleWidth на
+    // широкоформатном мониторе настолько большой, что множитель почти
+    // всегда упирался в native-размер текста (fitScale=1), и по отзыву
+    // клиента надпись на десктопе получалась "впритык" к верхнему меню
+    // и к кольцам солнечной системы сразу под ней. На узком (портретном,
+    // мобильном) экране такого эффекта нет - там predел почти всегда и
+    // так меньше 1 сам по себе (только что подтверждено скриншотом), так
+    // что снижаем потолок ТОЛЬКО для альбомной ориентации (aspect > 1).
+    const maxFitScale = camera.aspect > 1 ? 0.8 : 1
+    const fitScale = Math.min(maxFitScale, (visibleWidth * 0.94) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
     // масштаба родительского Object3D (sizeAttenuation считает размер
