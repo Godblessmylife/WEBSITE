@@ -198,6 +198,18 @@ export function Grabbable({
     }
   }
 
+  // По просьбе клиента: двойной клик/тап сразу хватает объект - не нужно
+  // сперва наводить курсор и жать кнопку "Переместить" в панели. Кнопка
+  // в панели никуда не делась (быстрый способ на десктопе, доступ к
+  // масштабу) - это ДОПОЛНИТЕЛЬНЫЙ, более быстрый способ того же самого
+  // действия (startMoving сам по себе не даёт схватить второй объект,
+  // пока первый не поставлен - см. craftStore.ts).
+  const onHitboxDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    if (isMoving || anyoneMoving) return
+    useCraftStore.getState().startMoving(id, position[1])
+  }
+
   const onHitboxPointerOver = (e: ThreeEvent<PointerEvent>) => {
     if (anyoneMoving) return
     e.stopPropagation()
@@ -213,6 +225,7 @@ export function Grabbable({
             <mesh
               position={hitboxCenter}
               onClick={onHitboxClick}
+              onDoubleClick={onHitboxDoubleClick}
               onPointerOver={onHitboxPointerOver}
               onPointerOut={scheduleHidePanel}
             >
