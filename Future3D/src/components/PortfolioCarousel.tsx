@@ -8,8 +8,65 @@ import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { useGameStore } from '@/utils/gameStore'
+import { useVideoModalStore } from '@/utils/videoModalStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useInView } from '@/hooks/useInView'
+
+// Два реальных видео-примера (YouTube Shorts) по просьбе клиента -
+// превью-миниатюры поверх карусели, открывают YouTube-видео в отдельном
+// модальном окне с автозапуском (VideoModal.tsx). ID вытащены из ссылок
+// вида youtube.com/shorts/<id> - тот же ID работает и в обычном
+// /embed/<id>, формат "Shorts" - это просто вертикальное видео, не
+// отдельный тип контента для встраивания.
+const SHOWCASE_VIDEOS = ['_-Eo8G3CYWc', 'JtXVOHKDpHk']
+
+// Миниатюра-кнопка: реальный кадр видео (img.youtube.com - публичный,
+// без API-ключа) вместо серой заглушки, плюс иконка play поверх - сразу
+// понятно, что это видео, а не картинка/карточка портфолио.
+function VideoThumbnail({ videoId }: { videoId: string }) {
+  const openVideo = useVideoModalStore((s) => s.open)
+  return (
+    <button
+      onClick={() => openVideo(videoId)}
+      aria-label="Смотреть видео"
+      style={{
+        position: 'relative',
+        width: '84px',
+        height: '150px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid rgba(95, 212, 255, 0.5)',
+        boxShadow: '0 0 20px rgba(95, 212, 255, 0.25), 0 8px 20px rgba(0, 0, 0, 0.45)',
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+        padding: 0,
+        background: '#0a1120',
+      }}
+    >
+      <img
+        src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+        alt=""
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(5, 7, 13, 0.25)',
+        }}
+      >
+        <svg width="34" height="34" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="12" fill="rgba(5, 7, 13, 0.65)" />
+          <path d="M9.5 7.5v9l7-4.5-7-4.5Z" fill="#eafcff" />
+        </svg>
+      </span>
+    </button>
+  )
+}
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -191,6 +248,28 @@ export function PortfolioCarousel() {
         <Carousel dragRef={dragRef} rotationRef={rotationRef} scale={isMobile ? 0.72 : 1} />
       </Canvas>
       )}
+
+      {/* Превью видео поверх карусели - pointerEvents:none на обёртке,
+          auto только на самих кнопках, иначе пустое место вокруг
+          миниатюр перехватывало бы drag-вращение карусели под собой. */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 'calc(2rem + env(safe-area-inset-bottom))',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '1rem',
+          pointerEvents: 'none',
+        }}
+      >
+        {SHOWCASE_VIDEOS.map((videoId) => (
+          <div key={videoId} style={{ pointerEvents: 'auto' }}>
+            <VideoThumbnail videoId={videoId} />
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
