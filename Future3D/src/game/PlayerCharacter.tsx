@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF, useKeyboardControls } from '@react-three/drei'
+import { useAnimations, useGLTF, useKeyboardControls } from '@react-three/drei'
 import { Ecctrl, type EcctrlHandle } from 'ecctrl'
 import { useButtonStore, useJoystickStore } from 'ecctrl/input'
 import { useCustomGravity } from 'ecctrl/gravity'
 import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
-import heroModelUrl from '../models/hero.glb'
+import heroModelUrl from '../models/hero-walk.glb'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -23,9 +23,23 @@ const EMPTY_MOVEMENT = {
 
 const CAPSULE_HALF_HEIGHT = 0.5
 const CAPSULE_RADIUS = 0.35
-// hero.glb сделан с ногами у y=0 (bbox: -0.00258..1.73828) — смещаем
-// модель вниз на высоту капсулы, чтобы ступни совпадали с полом.
+// Тот же приём, что был у hero.glb (ноги у y=0) - hero-walk.glb тоже
+// человеческого роста с ногами у основания, смещаем вниз на высоту
+// капсулы, чтобы ступни совпадали с полом.
 const MODEL_Y_OFFSET = -(CAPSULE_HALF_HEIGHT + CAPSULE_RADIUS)
+
+// Имена клипов, как их сохранил Meshy AI/FBX-экспорт ("Armature|Armature|
+// walking_man|baselayer" и т.п.) - длинные и с обеих сторон непредсказуемо
+// точные, поэтому ищем по подстроке, а не по точному совпадению (см.
+// merge-скрипт, которым была собрана hero-walk.glb - обе анимации взяты
+// из разных FBX-файлов Meshy, но общего единого стандартного скелета).
+const WALK_CLIP_PATTERN = /walking/i
+const RUN_CLIP_PATTERN = /run/i
+// Длительность перекрёстного затухания между состояниями - слишком
+// быстро (значения близкие к 0) даёт заметный "скачок" позы при смене
+// анимации, слишком медленно - персонаж ощутимо продолжает предыдущую
+// анимацию после того, как уже должен был остановиться/побежать.
+const FADE_DURATION = 0.2
 
 // Обычная гравитация теперь приходит из ЭТОГО поля (см. GameMode.tsx:
 // <Physics gravity={[0,0,0]}>), а не из глобальной настройки физики —
@@ -48,15 +62,69 @@ const flightMoveDir = new THREE.Vector3()
 const flightQuat = new THREE.Quaternion()
 const yawEuler = new THREE.Euler()
 
+type AnimState = 'idle' | 'walk' | 'run'
+
 export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
-  const { scene } = useGLTF(heroModelUrl)
+  const { scene, animations } = useGLTF(heroModelUrl)
+  const { actions } = useAnimations(animations, scene)
   const isDriving = useDriveStore((s) => !!s.drivingId)
   const tiltRef = useRef<THREE.Group>(null!)
-  const bobPhaseRef = useRef(0)
   const yawRef = useRef(0)
   const wasGodModeRef = useRef(false)
+  const animStateRef = useRef<AnimState>('idle')
   const [, getKeys] = useKeyboardControls()
   const setGravityField = useCustomGravity((s) => s.setGravityField)
+
+  // Ищем нужные клипы один раз - Object.values(actions) не меняется между
+  // рендерами, пересчитывать на каждый кадр незачем.
+  const walkAction = useRef<ReturnType<typeof useAnimations>['actions'][string] | null>(null)
+  const runAction = useRef<ReturnType<typeof useAnimations>['actions'][string] | null>(null)
+  useEffect(() => {
+    walkAction.current = Object.entries(actions).find(([name]) => WALK_CLIP_PATTERN.test(name))?.[1] ?? null
+    runAction.current = Object.entries(actions).find(([name]) => RUN_CLIP_PATTERN.test(name))?.[1] ?? null
+    // "Idle" - отдельного клипа нет (модель пришла только с ходьбой и
+    // бегом) - используем застывший на нулевом кадре цикл ходьбы вместо
+    // T-позы или анимации на паузе в случайной точке цикла: кадр 0 -
+    // единственная точка цикла, которую можно предсказуемо застолбить
+    // как "нейтральную стойку".
+    walkAction.current?.reset().play()
+    walkAction.current?.setEffectiveWeight(1)
+    if (walkAction.current) {
+      walkAction.current.paused = true
+      walkAction.current.time = 0
+    }
+    animStateRef.current = 'idle'
+  }, [actions])
+
+  // Переключение между Idle/Walk/Run - вызывается только при СМЕНЕ
+  // состояния (см. вызовы ниже), а не каждый кадр: crossFadeTo несёт
+  // смысл только как переход, повторный вызов на тот же стейт каждый
+  // кадр держал бы обе анимации в вечном 0.2с fade без завершения.
+  const setAnimState = (next: AnimState) => {
+    if (animStateRef.current === next) return
+    const walk = walkAction.current
+    const run = runAction.current
+    animStateRef.current = next
+    if (next === 'run' && run) {
+      walk?.fadeOut(FADE_DURATION)
+      run.reset().fadeIn(FADE_DURATION).play()
+      return
+    }
+    if (next === 'walk' && walk) {
+      run?.fadeOut(FADE_DURATION)
+      walk.paused = false
+      walk.reset().fadeIn(FADE_DURATION).play()
+      return
+    }
+    // idle - застываем на ходьбе (кадр 0), см. комментарий выше.
+    run?.fadeOut(FADE_DURATION)
+    if (walk) {
+      walk.paused = false
+      walk.time = 0
+      walk.reset().fadeIn(FADE_DURATION).play()
+      walk.paused = true
+    }
+  }
 
   useEffect(() => {
     setGravityField(() => (useGodModeStore.getState().active ? GRAVITY_ZERO : GRAVITY_DOWN))
@@ -111,33 +179,25 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     )
 
     if (godMode || isDriving) {
-      // Процедурная походка ниже — только для обычной ходьбы по земле.
+      // Анимация ниже — только для обычной ходьбы по земле; во время
+      // полёта/вождения персонаж либо невидим, либо не имитирует шаги.
+      setAnimState('idle')
       return
     }
 
-    // hero.glb без скелета и анимаций (перепроверено gltf-transform
-    // inspect — ни одного clip, ни одного skin) — настоящую анимацию
-    // ходьбы/бега сделать нельзя без другой модели. Вместо неподвижного
-    // скольжения — три процедурных сигнала, вместе дающие "живую" походку:
-    // наклон вперёд от скорости (было раньше) + вертикальный подскок
-    // (bobPhase) + покачивание из стороны в сторону в той же фазе,
-    // имитирующее перенос веса с ноги на ногу. Фаза считается от
-    // ПРОЙДЕННОГО пути (speed * delta), а не от времени — иначе частота
-    // "шагов" не менялась бы с ускорением при беге на Shift.
+    // hero-walk.glb пришла с настоящим скелетом и двумя клипами (ходьба,
+    // бег) - настоящая скелетная анимация вместо прежнего процедурного
+    // наклона/подскока (hero.glb был вообще без скелета, см. историю в
+    // соседнем плане). speed > 0 всё ещё определяет, движется ли
+    // персонаж физически (ecctrl), но теперь просто переключает, КАКОЙ
+    // клип проигрывается, а не как деформируется модель вручную.
     const speed = handle.relativeVelOnPlane.length()
-    const targetTilt = handle.isMoving ? THREE.MathUtils.clamp(speed * 0.05, 0, 0.22) : 0
-    const damp = 1 - Math.exp(-8 * delta)
-    tiltRef.current.rotation.x = THREE.MathUtils.lerp(tiltRef.current.rotation.x, targetTilt, damp)
-
-    if (handle.isMoving && speed > 0.05) {
-      bobPhaseRef.current += speed * delta * 2.2
-      const bob = Math.abs(Math.sin(bobPhaseRef.current))
-      const sway = Math.sin(bobPhaseRef.current)
-      tiltRef.current.position.y = bob * 0.06
-      tiltRef.current.rotation.z = THREE.MathUtils.lerp(tiltRef.current.rotation.z, sway * 0.05, damp)
+    if (!handle.isMoving || speed < 0.05) {
+      setAnimState('idle')
+    } else if (keys.run) {
+      setAnimState('run')
     } else {
-      tiltRef.current.position.y = THREE.MathUtils.lerp(tiltRef.current.position.y, 0, damp)
-      tiltRef.current.rotation.z = THREE.MathUtils.lerp(tiltRef.current.rotation.z, 0, damp)
+      setAnimState('walk')
     }
   })
 

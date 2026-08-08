@@ -17,3 +17,8 @@ Thumbs.db
 *.source.glb
 *.source.fbx
 *.source.obj
+
+# Сырые FBX-заготовки от Meshy AI (десятки-сотни МБ, включая .fbm-папки с
+# текстурами) - только материал для сборки итоговых src/models/*.glb
+# (см. hero-walk.glb/.source.glb), сами по себе на сайте не используются.
+Future3D/src/models/HeroCollection/
