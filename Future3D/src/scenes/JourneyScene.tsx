@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { CameraRig } from './CameraRig'
 import { FogController } from './FogController'
@@ -47,14 +48,47 @@ export function JourneyScene() {
   // равно полностью закрыто фикс-оверлеем GameMode - не размонтировать
   // его смысла нет.
   const isGameActive = useGameStore((s) => s.isGameActive)
+
+  // Та же защита, что и в GameMode.tsx (см. подробный комментарий там):
+  // без recovery этот Canvas оставался мёртвым и чёрным НАВСЕГДА при
+  // потере WebGL-контекста (нехватка видеопамяти на телефоне, сворачивание
+  // вкладки, поворот экрана) - именно этот сценарий похож на исходную
+  // жалобу клиента "не видно ни надписи ни фона на мобильном". У этого
+  // Canvas нет отдельного "меню", куда можно выйти при повторных потерях
+  // (в отличие от игры) - после исчерпания попыток просто прекращаем
+  // пересоздавать, чтобы не зациклиться.
+  const [canvasKey, setCanvasKey] = useState(0)
+  const recoveryAttemptsRef = useRef(0)
+  const MAX_CONTEXT_RECOVERY_ATTEMPTS = 3
+
   if (isGameActive) return null
 
   return (
     <Canvas
+      key={canvasKey}
       camera={{ fov: 60, near: 0.1, far: 500, position: [0, 60, 0] }}
       gl={{ antialias: true }}
       dpr={reduced ? [1, 1.5] : [1, 2]}
       style={{ width: '100%', height: '100%', display: 'block' }}
+      onCreated={({ gl }) => {
+        gl.domElement.addEventListener('webglcontextlost', (event) => {
+          // preventDefault() обязателен - без него браузер даже не
+          // пытается восстановить контекст, канвас гарантированно мёртв.
+          event.preventDefault()
+          recoveryAttemptsRef.current += 1
+          console.error(
+            '[JourneyScene] WebGL context lost, попытка восстановления',
+            recoveryAttemptsRef.current,
+          )
+          if (recoveryAttemptsRef.current > MAX_CONTEXT_RECOVERY_ATTEMPTS) return
+          // Полный ремонт (новый key) вместо пассивного ожидания
+          // webglcontextrestored: даже когда браузер сам восстанавливает
+          // контекст, текстуры/буферы Three.js всё равно потеряны
+          // безвозвратно - рисование ими на следующем кадре само кидает
+          // ошибку. Пересоздание с нуля надёжнее.
+          window.setTimeout(() => setCanvasKey((k) => k + 1), 300)
+        })
+      }}
     >
       <AdaptivePerformance setReduced={setReduced} />
       <CameraRig />
