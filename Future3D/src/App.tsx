@@ -16,9 +16,7 @@ import { GameLoadingScreen } from '@/game/GameLoadingScreen'
 import { JourneyLoadingScreen } from '@/scenes/JourneyLoadingScreen'
 import { GameErrorBoundary } from '@/game/GameErrorBoundary'
 import { StratosphereFlash } from '@/components/StratosphereFlash'
-import { JourneyTaglines } from '@/components/JourneyTaglines'
 import { ScrollHint } from '@/components/ScrollHint'
-import { JourneyTuner } from '@/components/JourneyTuner'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
@@ -64,7 +62,6 @@ export function App() {
             <JourneyScene />
           </Suspense>
           <StratosphereFlash />
-          <JourneyTaglines />
           {/* По просьбе клиента: люди не понимали, что страницу нужно
               скроллить - путешествие занимает целый экран (sticky) и без
               подсказки выглядит как статичная картинка. Сама гаснет после
@@ -105,13 +102,9 @@ export function App() {
 
       {isGalleryOpen && <PortfolioGallery />}
 
-      {/* По просьбе клиента: убрана временная диагностическая иконка
-          (DiagnosticOverlay, "!"/"i" в левом нижнем углу - её задача была
-          разово найти причину мобильного бага, актуальность прошла), а
-          на её месте снова тот же тюнер путешествия (шестерёнка), что
-          показывал процент прокрутки раньше - клиент попросил вернуть
-          именно эту кнопку. */}
-      <JourneyTuner />
+      {/* Тюнер путешествия (шестерёнка в левом нижнем углу) убран по
+          повторной просьбе клиента - сам компонент (JourneyTuner.tsx)
+          никуда не делся, просто не рендерится здесь. */}
     </>
   )
 }
