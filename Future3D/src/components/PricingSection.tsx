@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { SectionStarfield } from './SectionStarfield'
 import { useScrollStore } from '@/utils/scrollStore'
+import { LiquidButton } from '@/components/ui/liquid-glass-button'
+
+// Готовая, статическая страница оплаты (Trybit/CryptoCloud, POS-ссылка) -
+// без бэкенда: секретный API-ключ платёжного шлюза НЕ используется нигде
+// во фронтенде (это было бы утечкой - см. подробности решения в чате),
+// ссылка просто открывает уже настроенную страницу оплаты у провайдера.
+// Одна ссылка на все тарифы (не по кнопке на каждой карточке) - у неё
+// нет способа заранее передать конкретную сумму конкретного тарифа, так
+// что дублировать её на каждой карточке создало бы ложное впечатление,
+// что тарифы ведут на РАЗНЫЕ страницы с уже подставленной ценой.
+const PAYMENT_URL = 'https://pay.trybit.com/pos/kYtzJrJtRPNnPzsG'
 
 interface Tier {
   name: string
@@ -186,6 +197,20 @@ export function PricingSection() {
           {TIERS.map((tier) => (
             <TierCard key={tier.name} tier={tier} />
           ))}
+        </div>
+
+        <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.7rem' }}>
+          <LiquidButton
+            size="xl"
+            className="rounded-full border border-[#5fd4ff]/50 text-[#eafcff] shadow-[0_0_28px_rgba(95,212,255,0.35)] hover:shadow-[0_0_42px_rgba(95,212,255,0.55)]"
+            style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em', fontSize: '0.95rem' }}
+            onClick={() => window.open(PAYMENT_URL, '_blank', 'noopener,noreferrer')}
+          >
+            ОПЛАТИТЬ
+          </LiquidButton>
+          <p style={{ color: '#7d92a8', fontSize: '0.8rem', textAlign: 'center', maxWidth: '420px' }}>
+            Откроется страница оплаты — сумму и детали заказа уточните заранее в чате.
+          </p>
         </div>
       </div>
     </section>
