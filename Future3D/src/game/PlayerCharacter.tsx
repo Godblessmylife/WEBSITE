@@ -8,7 +8,8 @@ import { useCustomGravity } from 'ecctrl/gravity'
 import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
-import heroModelUrl from '../models/hero-walk.glb'
+import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
+import { HERO_MODELS, resolveHeroModel } from '@/utils/heroModels'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -65,6 +66,11 @@ const yawEuler = new THREE.Euler()
 type AnimState = 'idle' | 'walk' | 'run'
 
 export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
+  // Модель выбирается через NPC (QuestNpc.tsx/QuestUI.tsx) - смена id
+  // меняет URL, useGLTF сам подгружает новую модель (Suspense выше по
+  // дереву, см. GameMode.tsx, уже обрабатывает загрузку).
+  const selectedHeroId = useHeroSelectionStore((s) => s.selectedHeroId)
+  const heroModelUrl = resolveHeroModel(selectedHeroId).url
   const { scene, animations } = useGLTF(heroModelUrl)
   const { actions } = useAnimations(animations, scene)
   const isDriving = useDriveStore((s) => !!s.drivingId)
@@ -295,4 +301,4 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   )
 }
 
-useGLTF.preload(heroModelUrl)
+HERO_MODELS.forEach((model) => useGLTF.preload(model.url))

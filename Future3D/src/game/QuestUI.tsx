@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { QUESTS, areAllQuestsDone, useQuestStore } from '@/utils/questStore'
 import { useGameStore } from '@/utils/gameStore'
+import { HERO_MODELS } from '@/utils/heroModels'
+import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
 
 const panelStyle: CSSProperties = {
   position: 'absolute',
@@ -59,6 +62,11 @@ export function QuestDialogue() {
   const turnIn = useQuestStore((s) => s.turnIn)
   const setDialogueOpen = useQuestStore((s) => s.setDialogueOpen)
   const addScore = useGameStore((s) => s.addScore)
+  const selectedHeroId = useHeroSelectionStore((s) => s.selectedHeroId)
+  const setSelectedHero = useHeroSelectionStore((s) => s.setSelectedHero)
+  // Свой локальный тумблер, не в questStore - выбор внешности никак не
+  // связан с прогрессом квестов, незачем тащить его в тот же стор.
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   if (!isOpen) return null
 
@@ -96,10 +104,52 @@ export function QuestDialogue() {
             {action.label}
           </button>
         )}
+        <button style={actionButtonStyle} onClick={() => setPickerOpen((v) => !v)}>
+          Сменить внешность
+        </button>
         <button style={closeButtonStyle} onClick={() => setDialogueOpen(false)}>
           Закрыть
         </button>
       </div>
+      {/* Список моделей - тот же визуальный приём, что и у списка качества
+          графики (GraphicsSettingsButton.tsx): активный пункт подсвечен
+          рамкой/цветом текста. */}
+      {pickerOpen && (
+        <div
+          style={{
+            marginTop: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid rgba(255, 215, 106, 0.25)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          {HERO_MODELS.map((model) => {
+            const active = model.id === selectedHeroId
+            return (
+              <button
+                key={model.id}
+                onClick={() => setSelectedHero(model.id)}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.8rem',
+                  fontFamily: "'Orbitron', sans-serif",
+                  background: active ? 'rgba(255, 215, 106, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                  border: active ? '1px solid rgba(255, 215, 106, 0.9)' : '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '999px',
+                  color: active ? '#ffe9b0' : '#eafcff',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                {model.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
