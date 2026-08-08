@@ -87,9 +87,11 @@ const scalePercentStyle: CSSProperties = {
 // шаг кнопкой - нет. Слайдер остаётся (удобен на десктопе с мышью), а
 // кнопки - для точной подстройки одним тапом на любом устройстве.
 const SCALE_STEP = 0.1
+// Крупнее прежних 1.6rem - по отзыву клиента "удобнее увеличение и
+// уменьшение", особенно пальцем на телефоне.
 const resizeButtonStyle: CSSProperties = {
-  width: '1.6rem',
-  height: '1.6rem',
+  width: '2.1rem',
+  height: '2.1rem',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -99,11 +101,19 @@ const resizeButtonStyle: CSSProperties = {
   borderRadius: '50%',
   color: '#eafcff',
   fontFamily: "'Orbitron', sans-serif",
-  fontSize: '0.9rem',
+  fontSize: '1.05rem',
   lineHeight: 1,
   cursor: 'pointer',
   touchAction: 'manipulation',
 }
+
+// Удержание кнопки +/- быстро повторяет шаг вместо одного тапа за раз -
+// по отзыву клиента "удобнее... увеличение и уменьшение", особенно
+// когда нужно подогнать размер сильно отличающийся от текущего.
+// HOLD_START_DELAY_MS - короткая пауза перед началом повтора, чтобы
+// обычный быстрый тап не успевал зацепить лишний повтор.
+const HOLD_START_DELAY_MS = 350
+const HOLD_REPEAT_MS = 80
 
 export function Grabbable({
   id,
@@ -134,13 +144,49 @@ export function Grabbable({
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dragGroupRef = useRef<THREE.Group>(null!)
   const scaleGroupRef = useRef<THREE.Group>(null!)
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(
     () => () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current)
+      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current)
     },
     [],
   )
+
+  const stopScaleHold = () => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current)
+      holdTimeoutRef.current = null
+    }
+    if (holdIntervalRef.current) {
+      clearInterval(holdIntervalRef.current)
+      holdIntervalRef.current = null
+    }
+  }
+
+  // Один шаг сразу (обычный тап), затем после паузы - быстрый повтор,
+  // пока кнопка удержана. Читает АКТУАЛЬНОЕ значение из стора на каждый
+  // шаг (не замыкает scaleMultiplier из рендера), иначе повтор применял
+  // бы один и тот же шаг к устаревшему значению.
+  const startScaleHold = (step: number) => {
+    stopScaleHold()
+    const applyStep = () => {
+      const current = useCraftStore.getState().overrides[id]?.scale ?? 1
+      useCraftStore.getState().setScale(id, defaultPosition, current + step)
+      // На границе диапазона останавливаем повтор сами - если кнопка
+      // между тем стала disabled (см. проп ниже), она может перестать
+      // получать pointerup/pointerleave, и интервал остался бы висеть
+      // до размонтирования компонента.
+      if (current + step <= MIN_SCALE || current + step >= MAX_SCALE) stopScaleHold()
+    }
+    applyStep()
+    holdTimeoutRef.current = setTimeout(() => {
+      holdIntervalRef.current = setInterval(applyStep, HOLD_REPEAT_MS)
+    }, HOLD_START_DELAY_MS)
+  }
 
   // Сброс курсора, когда перенос закончился (пока он идёт, useFrame ниже
   // каждый кадр держит его 'grabbing' сам, независимо от hover).
@@ -233,7 +279,15 @@ export function Grabbable({
               <meshBasicMaterial visible={false} />
             </mesh>
           )}
-          {hovered && !anyoneMoving && (
+          {/* Панель теперь видна и ПОКА объект переносят (isMoving), не
+              только на hover - по отзыву клиента "удобнее перемещение и
+              увеличение/уменьшение": раньше во время самого переноса
+              панель пропадала (anyoneMoving было true), и изменить размер
+              можно было только ПОСЛЕ того, как объект уже поставлен на
+              место. Для остальных объектов, пока что-то ДРУГОЕ переносят,
+              ограничение !anyoneMoving сохранено - двигать/менять размер
+              можно только чему-то одному одновременно. */}
+          {(isMoving || (hovered && !anyoneMoving)) && (
             <Html
               position={[hitboxCenter[0], hitboxCenter[1] + hitboxSize[1] / 2 + 0.5, hitboxCenter[2]]}
               center
@@ -249,9 +303,10 @@ export function Grabbable({
                 <div style={scaleRowStyle}>
                   <button
                     style={resizeButtonStyle}
-                    onClick={() =>
-                      useCraftStore.getState().setScale(id, defaultPosition, scaleMultiplier - SCALE_STEP)
-                    }
+                    onPointerDown={() => startScaleHold(-SCALE_STEP)}
+                    onPointerUp={stopScaleHold}
+                    onPointerLeave={stopScaleHold}
+                    onPointerCancel={stopScaleHold}
                     disabled={scaleMultiplier <= MIN_SCALE}
                     aria-label="Уменьшить"
                   >
@@ -270,9 +325,10 @@ export function Grabbable({
                   />
                   <button
                     style={resizeButtonStyle}
-                    onClick={() =>
-                      useCraftStore.getState().setScale(id, defaultPosition, scaleMultiplier + SCALE_STEP)
-                    }
+                    onPointerDown={() => startScaleHold(SCALE_STEP)}
+                    onPointerUp={stopScaleHold}
+                    onPointerLeave={stopScaleHold}
+                    onPointerCancel={stopScaleHold}
                     disabled={scaleMultiplier >= MAX_SCALE}
                     aria-label="Увеличить"
                   >
