@@ -16,10 +16,14 @@ import { SOLAR_SYSTEM_LOOKAT_END } from './cameraPath'
 // этих пикселей и есть "домашние" позиции частиц, дающие форму букв в
 // состоянии покоя. Дальше это обычное облако точек (BufferGeometry),
 // без всякой связи с исходным canvas.
-const TEXT = 'РАЗРАБОТКА ВЕБ-САЙТОВ'
+// По отзыву клиента "сделать больше, в 2 строки" - каждая строка короче
+// объединённой одной строки, поэтому при том же ограничении по ширине
+// шрифт можно взять заметно крупнее (см. LINES ниже вместо TEXT).
+const LINES = ['РАЗРАБОТКА', 'ВЕБ-САЙТОВ']
 const CANVAS_W = 1536
-const CANVAS_H = 220
-const BASE_FONT_PX = 130
+// Вдвое выше прежнего (220) - под две строки вместо одной.
+const CANVAS_H = 420
+const BASE_FONT_PX = 180
 const CANVAS_PADDING = 60
 // Шаг сэмплирования в пикселях canvas - меньше шаг -> больше частиц
 // (плотнее и чётче буквы, но дороже). Подобран так, чтобы уложиться в
@@ -64,18 +68,21 @@ function sampleTextParticles(): Float32Array {
   ctx.textBaseline = 'middle'
 
   const fontFamily = pickHeadingFont()
-  // Размер шрифта подгоняется под фактическую ширину текста, а не задан
-  // фиксированным числом: на фиксированных 108px "РАЗРАБОТКА ВЕБ-САЙТОВ"
-  // (21 символ, жирный шрифт) оказалась ШИРЕ, чем сам canvas - конец
-  // строки ("ТОВ") просто не попадал в сэмплируемую область и пропадал
-  // (найдено скриншотом при проверке). measureText - на глаз тут
-  // угадать ширину без браузера было нельзя.
+  // Размер шрифта подгоняется под фактическую ширину САМОЙ ШИРОКОЙ строки,
+  // а не задан фиксированным числом - то же самое соображение, что и в
+  // однострочной версии (measureText - на глаз тут угадать ширину без
+  // браузера было нельзя), просто теперь строк две.
   ctx.font = `900 ${BASE_FONT_PX}px ${fontFamily}`
-  const measuredWidth = ctx.measureText(TEXT).width
+  const measuredWidth = Math.max(...LINES.map((line) => ctx.measureText(line).width))
   const maxWidth = CANVAS_W - CANVAS_PADDING * 2
   const fontPx = measuredWidth > maxWidth ? BASE_FONT_PX * (maxWidth / measuredWidth) : BASE_FONT_PX
   ctx.font = `900 ${fontPx}px ${fontFamily}`
-  ctx.fillText(TEXT, CANVAS_W / 2, CANVAS_H / 2 + 4)
+
+  const lineHeight = fontPx * 1.15
+  const startY = CANVAS_H / 2 - (lineHeight * (LINES.length - 1)) / 2
+  LINES.forEach((line, i) => {
+    ctx.fillText(line, CANVAS_W / 2, startY + i * lineHeight)
+  })
 
   const { data } = ctx.getImageData(0, 0, CANVAS_W, CANVAS_H)
   const positions: number[] = []
@@ -189,15 +196,23 @@ export function ParticleHeading() {
     // на глубине заголовка, и вписываем текст в 84% этой ширины -
     // одинаковый код без разбора на мобильный/десктопный кейс, просто
     // само подстраивается под любое соотношение сторон.
+    // НАЙДЕНА настоящая причина того, почему предыдущие три попытки
+    // увеличить надпись (0.84 -> 0.96 -> 0.99) почти ничего не меняли на
+    // глаз: "visibleHalfWidth" - это ПОЛОВИНА видимой на этой глубине
+    // ширины экрана (так и называется, формула для половины кадра -
+    // стандартная half-width для perspective-камеры). Но fitScale считал
+    // долю ОТ ЭТОЙ ПОЛОВИНЫ, а сравнивался с ПОЛНОЙ шириной текста
+    // (WORLD_WIDTH) - то есть даже при множителе 0.99 текст в итоге
+    // занимал только ~49.5% ЭКРАНА (0.99 половины), а не почти весь
+    // экран, как предполагалось по названию переменной и комментарию.
+    // Отсюда и "всё ещё маленькая" при каждой попытке поднять множитель -
+    // множитель почти ни на что не влиял, ошибка была на уровень выше.
     const camera = state.camera as THREE.PerspectiveCamera
     const verticalHalfFov = THREE.MathUtils.degToRad(camera.fov) / 2
-    const visibleHalfWidth = Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
-    // 0.84 -> 0.96 -> 0.99: по повторному отзыву клиента "надпись всё ещё
-    // маленькая, почти на весь экран, но чтобы не заходила за края" -
-    // подгонка под реальную ширину экрана уже сама не даёт вылезти за
-    // края при ЛЮБОМ значении здесь (это и есть весь смысл формулы),
-    // так что запас "на всякий случай" можно снизить почти до нуля.
-    const fitScale = Math.min(1, (visibleHalfWidth * 0.99) / WORLD_WIDTH)
+    const visibleWidth = 2 * Math.abs(LOCAL_OFFSET.z) * Math.tan(verticalHalfFov) * camera.aspect
+    // 0.94 от ПОЛНОЙ (не половинной) видимой ширины - реально почти во
+    // весь экран, с небольшим запасом, чтобы не касаться самых краёв.
+    const fitScale = Math.min(1, (visibleWidth * 0.94) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
     // масштаба родительского Object3D (sizeAttenuation считает размер

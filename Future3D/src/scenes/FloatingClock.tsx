@@ -92,8 +92,11 @@ export function FloatingClock() {
 
   return (
     <group ref={groupRef}>
+      {/* Немного уменьшены (было [3, 0.86]) по отзыву клиента - на фоне
+          укрупнённой надписи "РАЗРАБОТКА ВЕБ-САЙТОВ" (ParticleHeading.tsx)
+          часы стали смотреться непропорционально большими. */}
       <mesh>
-        <planeGeometry args={[3, 0.86]} />
+        <planeGeometry args={[2.55, 0.73]} />
         <meshBasicMaterial
           ref={materialRef}
           map={texture}
