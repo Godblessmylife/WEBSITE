@@ -118,6 +118,10 @@ export function GameMode() {
   const rotateGhost = useBuildStore((s) => s.rotateGhost)
   const raiseGhost = useBuildStore((s) => s.raiseGhost)
   const lowerGhost = useBuildStore((s) => s.lowerGhost)
+  // Кто-то уже строил (постройка пережила перезагрузку через localStorage)
+  // ИЛИ кирка открыта прямо сейчас - только тогда есть смысл держать
+  // компонент смонтированным вообще.
+  const hasPlacedBlocks = useBuildStore((s) => s.placedBlocks.length > 0)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -301,7 +305,14 @@ export function GameMode() {
               glowColor="#ffd76a"
             />
             <SpaceZone />
-            <PlacedBlocks />
+            {/* Монтируем ТОЛЬКО когда реально нужно (по отзыву клиента
+                "выкидывает из игры через 5 секунд" на мобильном после
+                добавления кирки) - PlacedBlocks грузит через useGLTF
+                отдельную ~2 МБ модель лестницы с текстурой; раньше это
+                происходило безусловно при КАЖДОМ входе в игру, даже если
+                никто ни разу не открывал кирку - лишняя нагрузка на и так
+                ограниченную VRAM слабых телефонов. */}
+            {(pickaxeActive || hasPlacedBlocks) && <PlacedBlocks />}
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />

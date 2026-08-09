@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
-import { HERO_MODELS, resolveHeroModel } from '@/utils/heroModels'
+import { resolveHeroModel } from '@/utils/heroModels'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -301,4 +301,12 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   )
 }
 
-HERO_MODELS.forEach((model) => useGLTF.preload(model.url))
+// По отзыву клиента "выкидывает из игры через 5 секунд" на мобильном -
+// раньше здесь безусловно предзагружались ОБЕ модели героя (~4 МБ
+// суммарно текстур+геометрии в VRAM) ради мгновенной смены внешности
+// через NPC, даже для игроков, ни разу не открывавших этот диалог.
+// Теперь сразу грузится только реально используемая модель; вторая
+// подгружается по требованию, когда открывается сам диалог смены
+// внешности (см. QuestUI.tsx) - платим лишним МБ только те, кто
+// действительно пользуется фичей.
+useGLTF.preload(resolveHeroModel(useHeroSelectionStore.getState().selectedHeroId).url)

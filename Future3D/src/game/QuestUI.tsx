@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useGLTF } from '@react-three/drei'
 import { QUESTS, areAllQuestsDone, useQuestStore } from '@/utils/questStore'
 import { useGameStore } from '@/utils/gameStore'
 import { HERO_MODELS } from '@/utils/heroModels'
@@ -104,7 +105,18 @@ export function QuestDialogue() {
             {action.label}
           </button>
         )}
-        <button style={actionButtonStyle} onClick={() => setPickerOpen((v) => !v)}>
+        <button
+          style={actionButtonStyle}
+          onClick={() => {
+            setPickerOpen((v) => !v)
+            // Остальные модели героя больше не грузятся заранее при входе
+            // в игру (см. PlayerCharacter.tsx - убрано ради VRAM на
+            // слабых телефонах) - догружаем их именно в момент, когда
+            // игрок реально открыл список выбора, чтобы клик по конкретной
+            // модели ощущался почти так же мгновенно, как раньше.
+            HERO_MODELS.forEach((model) => useGLTF.preload(model.url))
+          }}
+        >
           Сменить внешность
         </button>
         <button style={closeButtonStyle} onClick={() => setDialogueOpen(false)}>

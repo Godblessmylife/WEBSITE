@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useScrollStore } from '@/utils/scrollStore'
@@ -174,6 +174,42 @@ export function ParticleHeading() {
   }, [homePositions])
   const dotTexture = useMemo(() => createDotTexture(), [])
 
+  // БАГ (по отзыву клиента: "на мобильном убираю палец - буквы не
+  // встают на место, будто палец не убран"): R3F хранит `state.pointer`
+  // как ПОСЛЕДНЮЮ известную позицию указателя - на десктопе мышь,
+  // отходя от буквы, продолжает слать pointermove по всей странице (или
+  // хотя бы выходит за границы канваса), и обновлённая точка естественно
+  // перестаёт попадать в REPEL_RADIUS. На тач-экране после отпускания
+  // пальца событий движения больше нет ВООБЩЕ - `state.pointer` навсегда
+  // застревает на последней точке касания, ровно на букве, и разлёт
+  // никогда не считается завершённым. pointerActiveRef - явный флаг,
+  // сбрасываемый по pointerup/pointercancel (и touchend/touchcancel как
+  // подстраховка для браузеров без Pointer Events), проверяется в
+  // useFrame ниже перед тем, как доверять state.pointer.
+  const pointerActiveRef = useRef(false)
+  useEffect(() => {
+    const setActive = () => {
+      pointerActiveRef.current = true
+    }
+    const setInactive = () => {
+      pointerActiveRef.current = false
+    }
+    window.addEventListener('pointerdown', setActive)
+    window.addEventListener('pointermove', setActive)
+    window.addEventListener('pointerup', setInactive)
+    window.addEventListener('pointercancel', setInactive)
+    window.addEventListener('touchend', setInactive)
+    window.addEventListener('touchcancel', setInactive)
+    return () => {
+      window.removeEventListener('pointerdown', setActive)
+      window.removeEventListener('pointermove', setActive)
+      window.removeEventListener('pointerup', setInactive)
+      window.removeEventListener('pointercancel', setInactive)
+      window.removeEventListener('touchend', setInactive)
+      window.removeEventListener('touchcancel', setInactive)
+    }
+  }, [])
+
   useFrame((state) => {
     const progress = THREE.MathUtils.clamp(useScrollStore.getState().progress, 0, 1)
     const opacity = 1 - THREE.MathUtils.smoothstep(progress, FADE_OUT_START, FADE_OUT_END)
@@ -221,7 +257,11 @@ export function ParticleHeading() {
     // мобильном) экране такого эффекта нет - там predел почти всегда и
     // так меньше 1 сам по себе (только что подтверждено скриншотом), так
     // что снижаем потолок ТОЛЬКО для альбомной ориентации (aspect > 1).
-    const maxFitScale = camera.aspect > 1 ? 0.8 : 1
+    // По отзыву клиента "на мобильном сделать чуточку меньше" - раньше
+    // портретный кейс вообще не имел верхнего предела (1 = "родной"
+    // размер надписи без уменьшения), в отличие от альбомного (0.8).
+    // 0.88 - небольшое, а не резкое уменьшение, как и просили.
+    const maxFitScale = camera.aspect > 1 ? 0.8 : 0.88
     const fitScale = Math.min(maxFitScale, (visibleWidth * 0.94) / WORLD_WIDTH)
     groupRef.current.scale.setScalar(fitScale)
     // THREE.PointsMaterial.size - мировые единицы, не зависящие от
@@ -240,7 +280,7 @@ export function ParticleHeading() {
     planeNormal.set(0, 0, 1).applyQuaternion(groupRef.current.quaternion)
     plane.setFromNormalAndCoplanarPoint(planeNormal, groupRef.current.position)
     raycaster.setFromCamera(state.pointer, state.camera)
-    const hit = raycaster.ray.intersectPlane(plane, worldHit)
+    const hit = pointerActiveRef.current ? raycaster.ray.intersectPlane(plane, worldHit) : null
     if (hit) {
       groupRef.current.worldToLocal(localHit.copy(worldHit))
     } else {
