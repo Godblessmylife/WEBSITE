@@ -11,7 +11,9 @@ import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
 import { GraphicsSettingsButton } from './GraphicsSettingsButton'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
+import { useBuildStore, buildGhostStore } from '@/utils/buildStore'
 import { CraftModeController } from './CraftModeController'
+import { PlacedBlocks } from './PlacedBlocks'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 import { useIsPortrait } from '@/utils/useIsPortrait'
@@ -109,6 +111,13 @@ export function GameMode() {
   // оба способа управления одним и тем же пальцем разом работать не
   // могут - явный переключатель отдаёт приоритет одному из двух.
   const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
+  // Кирка/стройка лестницами (Дополнение 3) - см. подробный комментарий
+  // в buildStore.ts про сетку/масштаб модели.
+  const pickaxeActive = useBuildStore((s) => s.pickaxeActive)
+  const setPickaxeActive = useBuildStore((s) => s.setPickaxeActive)
+  const rotateGhost = useBuildStore((s) => s.rotateGhost)
+  const raiseGhost = useBuildStore((s) => s.raiseGhost)
+  const lowerGhost = useBuildStore((s) => s.lowerGhost)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -182,6 +191,17 @@ export function GameMode() {
   // клик не задел ни один интерактивный объект сцены (земля/декорации
   // без onClick это не объекты-цели).
   const handleCanvasPointerMissed = () => {
+    // Кирка активна - клик мимо интерактивных объектов ставит блок
+    // лестницы в текущей точке "призрака", а не двигает объект карты
+    // (обе фичи используют один и тот же onPointerMissed, но не бывают
+    // нужны одновременно - кирка проверяется первой).
+    const buildState = useBuildStore.getState()
+    if (buildState.pickaxeActive) {
+      const ghost = buildGhostStore.getState()
+      if (ghost.visible) buildState.placeBlock(ghost.x, ghost.z)
+      return
+    }
+
     const { movingId, movingOriginalY } = useCraftStore.getState()
     if (!movingId || movingOriginalY === null) return
     const ghost = craftGhostStore.getState()
@@ -281,6 +301,7 @@ export function GameMode() {
               glowColor="#ffd76a"
             />
             <SpaceZone />
+            <PlacedBlocks />
           </Physics>
         </Suspense>
         <GameCamera ecctrlRef={ecctrlRef} />
@@ -454,6 +475,100 @@ export function GameMode() {
             top: 'auto',
           }}
         />
+      )}
+
+      {/* Кирка (Дополнение 3) - ставит копии модели лестницы по сетке,
+          как блоки в Minecraft. Отдельная HUD-кнопка (не в выпадающем
+          меню настроек шестерёнки - это игровой инструмент, а не
+          настройка графики), с подсветкой активного состояния так же,
+          как у кнопок качества в GraphicsSettingsButton.tsx. Кнопки
+          "Повернуть"/"Выше"/"Ниже" появляются только пока кирка активна -
+          управляют ориентацией и высотой "призрака" перед постановкой. */}
+      {isLoaded && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
+            left: `calc(${edgeInset} + env(safe-area-inset-left))`,
+            display: 'flex',
+            gap: '0.5rem',
+            zIndex: 1001,
+          }}
+        >
+          <button
+            onClick={() => setPickaxeActive(!pickaxeActive)}
+            style={{
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: pickaxeActive ? 'rgba(255, 180, 70, 0.9)' : 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(255, 180, 70, 0.8)',
+              borderRadius: '999px',
+              color: pickaxeActive ? '#241300' : '#ffd9a0',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              fontWeight: pickaxeActive ? 700 : 400,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            ⛏ Кирка
+          </button>
+          {pickaxeActive && (
+            <>
+              <button
+                onClick={rotateGhost}
+                style={{
+                  padding: btnPadding,
+                  minHeight: btnMinHeight,
+                  background: 'rgba(10, 17, 32, 0.6)',
+                  border: '1px solid rgba(255, 180, 70, 0.8)',
+                  borderRadius: '999px',
+                  color: '#ffd9a0',
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: btnFontSize,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                ⟳ Повернуть
+              </button>
+              <button
+                onClick={lowerGhost}
+                style={{
+                  padding: btnPadding,
+                  minHeight: btnMinHeight,
+                  background: 'rgba(10, 17, 32, 0.6)',
+                  border: '1px solid rgba(255, 180, 70, 0.8)',
+                  borderRadius: '999px',
+                  color: '#ffd9a0',
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: btnFontSize,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                ▼
+              </button>
+              <button
+                onClick={raiseGhost}
+                style={{
+                  padding: btnPadding,
+                  minHeight: btnMinHeight,
+                  background: 'rgba(10, 17, 32, 0.6)',
+                  border: '1px solid rgba(255, 180, 70, 0.8)',
+                  borderRadius: '999px',
+                  color: '#ffd9a0',
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: btnFontSize,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                ▲
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* Сесть/выйти из машины - ENTER на клавиатуре уже работает
