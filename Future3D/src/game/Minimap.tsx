@@ -6,9 +6,11 @@ import type { EcctrlHandle } from 'ecctrl'
 import { minimapPlayerStore } from '@/utils/minimapStore'
 import { useQuestStore } from '@/utils/questStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
+import { WORLD_HALF_EXTENT } from './worldConstants'
 
-// Половина стороны площадки (см. GameWorld.tsx: DesertGround 280x280).
-const WORLD_HALF = 140
+// Половина стороны площадки (см. worldConstants.ts - единый источник
+// этого размера для всей игры, включая GameWorld.tsx: DesertGround).
+const WORLD_HALF = WORLD_HALF_EXTENT
 const MAP_SIZE = 168
 
 function worldToMap(x: number, z: number) {

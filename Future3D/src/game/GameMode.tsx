@@ -18,6 +18,7 @@ import { useIsPortrait } from '@/utils/useIsPortrait'
 import { RotateDevicePrompt } from './RotateDevicePrompt'
 import { AdaptivePerformance } from '@/utils/AdaptivePerformance'
 import { GameWorld } from './GameWorld'
+import { CAMERA_FAR, FOG_FAR } from './worldConstants'
 import { PlayerCharacter } from './PlayerCharacter'
 import { GameCamera } from './GameCamera'
 import { Portal } from './Portal'
@@ -197,7 +198,7 @@ export function GameMode() {
           с castShadow, так что без теней мир не станет менее читаемым. */}
       <Canvas
         key={canvasKey}
-        camera={{ fov: 60, near: 0.1, far: 300 }}
+        camera={{ fov: 60, near: 0.1, far: CAMERA_FAR }}
         // reduced (живой fps действительно проседает, AdaptivePerformance)
         // всегда переопределяет ручной выбор качества вниз до минимума -
         // это подстраховка от реального зависания, а не человеческий
@@ -240,10 +241,10 @@ export function GameMode() {
       >
         <AdaptivePerformance setReduced={setReduced} />
         <color attach="background" args={['#0a1120']} />
-        {/* far поднят с 70 до 170 вместе с увеличением площадки
-            (GameWorld: 140->280) — гора (MapProps: Mountain, ~90-130
-            юнитов от центра) должна быть видна, а не тонуть в тумане. */}
-        <fog attach="fog" args={['#0a1120', 20, 170]} />
+        {/* far - см. worldConstants.ts (FOG_FAR), увеличен вместе с
+            площадкой (WORLD_HALF_EXTENT) — далёкие объекты карты должны
+            быть видны, а не тонуть в тумане раньше времени. */}
+        <fog attach="fog" args={['#0a1120', 20, FOG_FAR]} />
         <Suspense
           fallback={
             <Html center>

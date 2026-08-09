@@ -9,6 +9,7 @@ import { useCraftStore } from '@/utils/craftStore'
 import { useDriveStore, driveLiveStore } from '@/utils/driveStore'
 import car1Url from '../models/Car1.glb'
 import car2Url from '../models/car2.glb'
+import { CAR_WORLD_BOUND } from './worldConstants'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 // Переиспользуемый temp-вектор для проверки расстояния до машины (тот же
@@ -47,13 +48,14 @@ const CAR_VISUAL_YAW_OFFSET: Record<string, number> = {
   car2: 0,
 }
 
-// Мир (DesertGround, GameWorld.tsx) - плоская площадка 280x280 с
-// коллайдером ТОЛЬКО в этих границах. Раньше машину ничего не
-// останавливало у края - уехав достаточно далеко и выйдя там, игрок
-// оказывался вне коллайдера земли и падал в пустоту ("падает за
-// текстуры" по отзыву клиента). Небольшой отступ от 140 (реальный край)
-// - чтобы машина разворачивалась, не долетая до самой границы визуально.
-const WORLD_BOUND = 130
+// Мир (DesertGround, GameWorld.tsx) - плоская площадка с коллайдером
+// ТОЛЬКО в этих границах (WORLD_HALF_EXTENT, worldConstants.ts). Раньше
+// машину ничего не останавливало у края - уехав достаточно далеко и
+// выйдя там, игрок оказывался вне коллайдера земли и падал в пустоту
+// ("падает за текстуры" по отзыву клиента). CAR_WORLD_BOUND - небольшой
+// отступ от реального края - чтобы машина разворачивалась, не долетая
+// до самой границы визуально.
+const WORLD_BOUND = CAR_WORLD_BOUND
 
 function carRestPosition(id: string): [number, number, number] {
   return useCraftStore.getState().overrides[id]?.position ?? CAR_DEFAULTS[id].position

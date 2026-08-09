@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 import { MapProps } from './MapProps'
+import { WORLD_HALF_EXTENT, WORLD_SIZE } from './worldConstants'
 
 // Остров (внешняя модель, экспортированная в масштабе ~18000 условных
 // единиц) визуально "не совпал по высоте" с полом — герой падал сквозь
@@ -36,7 +37,11 @@ function createSandTexture() {
   const texture = new THREE.CanvasTexture(canvas)
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
-  texture.repeat.set(20, 20)
+  // 20 повторов на прежние 280 единиц площадки (1 повтор на 14 единиц) -
+  // держим ту же плотность узора на увеличенной втрое площадке, иначе
+  // текстура растянулась бы и стала заметно более размытой/крупной.
+  const tileDensity = 20 / 280
+  texture.repeat.set(WORLD_SIZE * tileDensity, WORLD_SIZE * tileDensity)
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
 }
@@ -54,15 +59,18 @@ function DesertGround() {
   // результат, но без зависимости от автогенерации.
   return (
     <RigidBody type="fixed" colliders={false}>
-      {/* Полуразмеры совпадают с необёрнутой геометрией (280x280x0.5 / 2),
-          а не с итоговой видимой ориентацией — коллайдер повёрнут точно
-          так же, как mesh, а не переставлены оси в args. Площадка
-          увеличена вдвое (140->280) по просьбе клиента — под гору
-          (MapProps: Mountain) и новую декорацию нужно место подальше от
-          стартового кластера. */}
-      <CuboidCollider args={[140, 140, 0.25]} position={[0, -0.25, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+      {/* Полуразмеры совпадают с необёрнутой геометрией (WORLD_SIZE x
+          WORLD_SIZE x0.5 / 2), а не с итоговой видимой ориентацией —
+          коллайдер повёрнут точно так же, как mesh, а не переставлены оси
+          в args. Площадка увеличена втрое по просьбе клиента - см.
+          worldConstants.ts, единый источник этого размера для всей игры. */}
+      <CuboidCollider
+        args={[WORLD_HALF_EXTENT, WORLD_HALF_EXTENT, 0.25]}
+        position={[0, -0.25, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]} receiveShadow>
-        <boxGeometry args={[280, 280, 0.5]} />
+        <boxGeometry args={[WORLD_SIZE, WORLD_SIZE, 0.5]} />
         <meshStandardMaterial map={texture} roughness={0.95} />
       </mesh>
     </RigidBody>
