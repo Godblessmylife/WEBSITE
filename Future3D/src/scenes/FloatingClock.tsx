@@ -14,7 +14,9 @@ const DISSOLVE_END = 0.14
 // внизу кадра именно в начале пути, независимо от точной формы
 // cameraPath (не нужно подбирать мировые координаты вручную без
 // возможности посмотреть в браузере).
-const LOCAL_OFFSET = new THREE.Vector3(0, -3.2, -7)
+// По отзыву клиента "часы чуть поднять вверх" - было -3.2, сейчас чуть
+// менее отрицательное значение поднимает панель немного выше в кадре.
+const LOCAL_OFFSET = new THREE.Vector3(0, -2.9, -7)
 const worldOffset = new THREE.Vector3()
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })
