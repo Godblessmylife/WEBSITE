@@ -14,6 +14,8 @@ import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { useBuildStore, buildGhostStore } from '@/utils/buildStore'
 import { CraftModeController } from './CraftModeController'
 import { PlacedBlocks } from './PlacedBlocks'
+import { useProfileStore } from '@/utils/profileStore'
+import { ProfilePanel } from './ProfilePanel'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 import { useIsPortrait } from '@/utils/useIsPortrait'
@@ -111,17 +113,15 @@ export function GameMode() {
   // оба способа управления одним и тем же пальцем разом работать не
   // могут - явный переключатель отдаёт приоритет одному из двух.
   const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
-  // Кирка/стройка лестницами (Дополнение 3) - см. подробный комментарий
-  // в buildStore.ts про сетку/масштаб модели.
+  // Кирка/стройка лестницами (Дополнение 3) - кнопка-точка входа в HUD
+  // убрана по просьбе клиента (Дополнение 4, заменена на "Профиль"), но
+  // сам стор/рендер поставленных блоков не удалён - см. подробный
+  // комментарий в buildStore.ts. pickaxeActive теперь всегда false
+  // (больше ничего не вызывает setPickaxeActive(true)), hasPlacedBlocks
+  // держит уже поставленные раньше блоки видимыми.
   const pickaxeActive = useBuildStore((s) => s.pickaxeActive)
-  const setPickaxeActive = useBuildStore((s) => s.setPickaxeActive)
-  const rotateGhost = useBuildStore((s) => s.rotateGhost)
-  const raiseGhost = useBuildStore((s) => s.raiseGhost)
-  const lowerGhost = useBuildStore((s) => s.lowerGhost)
-  // Кто-то уже строил (постройка пережила перезагрузку через localStorage)
-  // ИЛИ кирка открыта прямо сейчас - только тогда есть смысл держать
-  // компонент смонтированным вообще.
   const hasPlacedBlocks = useBuildStore((s) => s.placedBlocks.length > 0)
+  const setProfileOpen = useProfileStore((s) => s.setOpen)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -488,98 +488,31 @@ export function GameMode() {
         />
       )}
 
-      {/* Кирка (Дополнение 3) - ставит копии модели лестницы по сетке,
-          как блоки в Minecraft. Отдельная HUD-кнопка (не в выпадающем
-          меню настроек шестерёнки - это игровой инструмент, а не
-          настройка графики), с подсветкой активного состояния так же,
-          как у кнопок качества в GraphicsSettingsButton.tsx. Кнопки
-          "Повернуть"/"Выше"/"Ниже" появляются только пока кирка активна -
-          управляют ориентацией и высотой "призрака" перед постановкой. */}
+      {/* "Профиль" (Дополнение 4) - заменила кнопку "Кирка" в этом месте
+          HUD по просьбе клиента. Открывает ProfilePanel.tsx: вращаемое
+          3D-превью персонажа, смена модели, кнопки скиллов. */}
       {isLoaded && (
-        <div
+        <button
+          onClick={() => setProfileOpen(true)}
           style={{
             position: 'absolute',
             bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
             left: `calc(${edgeInset} + env(safe-area-inset-left))`,
-            display: 'flex',
-            gap: '0.5rem',
+            padding: btnPadding,
+            minHeight: btnMinHeight,
+            background: 'rgba(10, 17, 32, 0.6)',
+            border: '1px solid rgba(255, 215, 106, 0.6)',
+            borderRadius: '999px',
+            color: '#ffe9b0',
+            fontFamily: "'Orbitron', sans-serif",
+            fontSize: btnFontSize,
+            cursor: 'pointer',
+            touchAction: 'manipulation',
             zIndex: 1001,
           }}
         >
-          <button
-            onClick={() => setPickaxeActive(!pickaxeActive)}
-            style={{
-              padding: btnPadding,
-              minHeight: btnMinHeight,
-              background: pickaxeActive ? 'rgba(255, 180, 70, 0.9)' : 'rgba(10, 17, 32, 0.6)',
-              border: '1px solid rgba(255, 180, 70, 0.8)',
-              borderRadius: '999px',
-              color: pickaxeActive ? '#241300' : '#ffd9a0',
-              fontFamily: "'Orbitron', sans-serif",
-              fontSize: btnFontSize,
-              fontWeight: pickaxeActive ? 700 : 400,
-              cursor: 'pointer',
-              touchAction: 'manipulation',
-            }}
-          >
-            ⛏ Кирка
-          </button>
-          {pickaxeActive && (
-            <>
-              <button
-                onClick={rotateGhost}
-                style={{
-                  padding: btnPadding,
-                  minHeight: btnMinHeight,
-                  background: 'rgba(10, 17, 32, 0.6)',
-                  border: '1px solid rgba(255, 180, 70, 0.8)',
-                  borderRadius: '999px',
-                  color: '#ffd9a0',
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontSize: btnFontSize,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                }}
-              >
-                ⟳ Повернуть
-              </button>
-              <button
-                onClick={lowerGhost}
-                style={{
-                  padding: btnPadding,
-                  minHeight: btnMinHeight,
-                  background: 'rgba(10, 17, 32, 0.6)',
-                  border: '1px solid rgba(255, 180, 70, 0.8)',
-                  borderRadius: '999px',
-                  color: '#ffd9a0',
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontSize: btnFontSize,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                }}
-              >
-                ▼
-              </button>
-              <button
-                onClick={raiseGhost}
-                style={{
-                  padding: btnPadding,
-                  minHeight: btnMinHeight,
-                  background: 'rgba(10, 17, 32, 0.6)',
-                  border: '1px solid rgba(255, 180, 70, 0.8)',
-                  borderRadius: '999px',
-                  color: '#ffd9a0',
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontSize: btnFontSize,
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                }}
-              >
-                ▲
-              </button>
-            </>
-          )}
-        </div>
+          👤 Профиль
+        </button>
       )}
 
       {/* Сесть/выйти из машины - ENTER на клавиатуре уже работает
@@ -628,6 +561,7 @@ export function GameMode() {
           <QuestLog />
           <QuestDialogue />
           <TeleportEffect />
+          <ProfilePanel />
         </>
       )}
 

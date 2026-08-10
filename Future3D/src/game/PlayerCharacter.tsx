@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
-import { resolveHeroModel } from '@/utils/heroModels'
+import { resolveHeroModel, WALK_CLIP_PATTERN } from '@/utils/heroModels'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -34,7 +34,6 @@ const MODEL_Y_OFFSET = -(CAPSULE_HALF_HEIGHT + CAPSULE_RADIUS)
 // точные, поэтому ищем по подстроке, а не по точному совпадению (см.
 // merge-скрипт, которым была собрана hero-walk.glb - обе анимации взяты
 // из разных FBX-файлов Meshy, но общего единого стандартного скелета).
-const WALK_CLIP_PATTERN = /walking/i
 const RUN_CLIP_PATTERN = /run/i
 // Длительность перекрёстного затухания между состояниями - слишком
 // быстро (значения близкие к 0) даёт заметный "скачок" позы при смене
