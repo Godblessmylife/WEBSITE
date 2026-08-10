@@ -16,6 +16,8 @@ import { CraftModeController } from './CraftModeController'
 import { PlacedBlocks } from './PlacedBlocks'
 import { useProfileStore } from '@/utils/profileStore'
 import { ProfilePanel } from './ProfilePanel'
+import { SkillsButton } from './SkillsButton'
+import { useCameraZoomStore } from '@/utils/cameraZoomStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
 import { useIsPortrait } from '@/utils/useIsPortrait'
@@ -122,6 +124,8 @@ export function GameMode() {
   const pickaxeActive = useBuildStore((s) => s.pickaxeActive)
   const hasPlacedBlocks = useBuildStore((s) => s.placedBlocks.length > 0)
   const setProfileOpen = useProfileStore((s) => s.setOpen)
+  const cameraZoomed = useCameraZoomStore((s) => s.zoomed)
+  const toggleCameraZoom = useCameraZoomStore((s) => s.toggle)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -490,29 +494,58 @@ export function GameMode() {
 
       {/* "Профиль" (Дополнение 4) - заменила кнопку "Кирка" в этом месте
           HUD по просьбе клиента. Открывает ProfilePanel.tsx: вращаемое
-          3D-превью персонажа, смена модели, кнопки скиллов. */}
+          3D-превью персонажа, смена модели, кнопки скиллов. Рядом -
+          "Скиллы" (та же анимация, что и в профиле, но на живом
+          персонаже прямо на карте) и "Приблизить" (камера ближе к лицу,
+          см. cameraZoomStore.ts/GameCamera.tsx). */}
       {isLoaded && (
-        <button
-          onClick={() => setProfileOpen(true)}
+        <div
           style={{
             position: 'absolute',
             bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
             left: `calc(${edgeInset} + env(safe-area-inset-left))`,
-            padding: btnPadding,
-            minHeight: btnMinHeight,
-            background: 'rgba(10, 17, 32, 0.6)',
-            border: '1px solid rgba(255, 215, 106, 0.6)',
-            borderRadius: '999px',
-            color: '#ffe9b0',
-            fontFamily: "'Orbitron', sans-serif",
-            fontSize: btnFontSize,
-            cursor: 'pointer',
-            touchAction: 'manipulation',
+            display: 'flex',
+            gap: '0.5rem',
             zIndex: 1001,
           }}
         >
-          👤 Профиль
-        </button>
+          <button
+            onClick={() => setProfileOpen(true)}
+            style={{
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(255, 215, 106, 0.6)',
+              borderRadius: '999px',
+              color: '#ffe9b0',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            👤 Профиль
+          </button>
+          <SkillsButton style={{ position: 'relative' }} />
+          <button
+            onClick={toggleCameraZoom}
+            style={{
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: cameraZoomed ? 'rgba(147, 92, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(147, 92, 255, 0.7)',
+              borderRadius: '999px',
+              color: cameraZoomed ? '#0c0518' : '#d7c3ff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              fontWeight: cameraZoomed ? 700 : 400,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            🔍 Приблизить
+          </button>
+        </div>
       )}
 
       {/* Сесть/выйти из машины - ENTER на клавиатуре уже работает

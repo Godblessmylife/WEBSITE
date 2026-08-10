@@ -5,11 +5,18 @@ import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
 import { useTeleportStore } from '@/utils/teleportStore'
 import { useDriveStore, driveLiveStore } from '@/utils/driveStore'
+import { useCameraZoomStore } from '@/utils/cameraZoomStore'
 
 // Вид от третьего лица "как в ГТА" — позади и чуть выше персонажа. За
 // рулём машины камера чуть дальше отъезжает назад (машина "длиннее"
 // персонажа, тот же офсет упирался бы в капот/крышу).
 const LOCAL_OFFSET = new THREE.Vector3(0, 2.2, -4.5)
+// "Приблизить к лицу" (Дополнение 4) - НЕ настоящий вид от первого лица
+// (решено с клиентом: камера остаётся СНАРУЖИ модели, просто заметно
+// ближе и чуть ниже) - минимальный риск сломать существующий механизм
+// лерпа/lookAt ниже, он не меняется вообще, меняется только то, какой
+// офсет в него подставляется.
+const ZOOM_OFFSET = new THREE.Vector3(0, 1.7, -1.6)
 const CAR_LOCAL_OFFSET = new THREE.Vector3(0, 3.4, -8)
 const LOOK_OFFSET = new THREE.Vector3(0, 1.2, 0)
 
@@ -65,7 +72,8 @@ export function GameCamera({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | 
       initializedRef.current = false
     }
 
-    behind.copy(LOCAL_OFFSET).applyQuaternion(handle.currQuat)
+    const zoomed = useCameraZoomStore.getState().zoomed
+    behind.copy(zoomed ? ZOOM_OFFSET : LOCAL_OFFSET).applyQuaternion(handle.currQuat)
     targetPos.copy(handle.currPos).add(behind)
 
     if (!initializedRef.current) {

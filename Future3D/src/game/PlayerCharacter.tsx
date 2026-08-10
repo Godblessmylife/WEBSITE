@@ -10,6 +10,7 @@ import { useGodModeStore } from '@/utils/godModeStore'
 import { useDriveStore } from '@/utils/driveStore'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
 import { resolveHeroModel, WALK_CLIP_PATTERN } from '@/utils/heroModels'
+import { useSkillStore } from '@/utils/skillStore'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -62,7 +63,15 @@ const flightMoveDir = new THREE.Vector3()
 const flightQuat = new THREE.Quaternion()
 const yawEuler = new THREE.Euler()
 
-type AnimState = 'idle' | 'walk' | 'run'
+// 'skill' (Дополнение 4) - персонаж проигрывает одноразовую анимацию
+// скилла/танца, вызванную кнопкой в HUD (см. ветку в useFrame ниже).
+// Не обрабатывается в setAnimState (он занимается только idle/walk/run)
+// - но обязателен как отдельное значение animStateRef: без него, когда
+// скилл заканчивается точно в состоянии idle "до" и "после", проверка
+// animStateRef.current === next в setAnimState('idle') молча ничего бы
+// не сделала (тот же idle) - а вес анимации ходьбы уже был сведён в 0
+// перед скиллом (fadeOut) и не получил бы команды вернуться обратно.
+type AnimState = 'idle' | 'walk' | 'run' | 'skill'
 
 export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | null> }) {
   // Модель выбирается через NPC (QuestNpc.tsx/QuestUI.tsx) - смена id
@@ -84,6 +93,11 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   // рендерами, пересчитывать на каждый кадр незачем.
   const walkAction = useRef<ReturnType<typeof useAnimations>['actions'][string] | null>(null)
   const runAction = useRef<ReturnType<typeof useAnimations>['actions'][string] | null>(null)
+  // Скилл (Дополнение 4) - какой activeSkillId уже обрабатывается прямо
+  // сейчас (чтобы не запускать один и тот же клип заново каждый кадр,
+  // пока кнопка удерживается активной) и сам проигрываемый экшн.
+  const skillActionRef = useRef<ReturnType<typeof useAnimations>['actions'][string] | null>(null)
+  const activeSkillIdRef = useRef<string | null>(null)
   useEffect(() => {
     walkAction.current = Object.entries(actions).find(([name]) => WALK_CLIP_PATTERN.test(name))?.[1] ?? null
     runAction.current = Object.entries(actions).find(([name]) => RUN_CLIP_PATTERN.test(name))?.[1] ?? null
@@ -164,13 +178,15 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     // (см. движок ecctrl) - клавиатурные булевы поля здесь остаются
     // только для десктопа (на мобильном keys всегда false, конфликта нет).
     const moveJoystick = useJoystickStore.getState().joysticks.move ?? EMPTY_JOYSTICK
+    // Скилл (Дополнение 4) - активируется кнопкой в HUD (GameMode.tsx).
+    const activeSkillId = useSkillStore.getState().activeSkillId
 
-    // В God Mode/за рулём Ecctrl не должен пытаться сам ходить/прыгать/
-    // поворачивать персонажа обычным способом — передаём ему "все клавиши
-    // отпущены", а не читаем джойстик/jump, иначе несколько систем
-    // управления телом будут конкурировать одновременно.
+    // В God Mode/за рулём/во время скилла Ecctrl не должен пытаться сам
+    // ходить/прыгать/поворачивать персонажа обычным способом — передаём
+    // ему "все клавиши отпущены", а не читаем джойстик/jump, иначе
+    // несколько систем управления телом будут конкурировать одновременно.
     handle.setMovement(
-      godMode || isDriving
+      godMode || isDriving || activeSkillId
         ? EMPTY_MOVEMENT
         : {
             forward: keys.forward,
@@ -187,6 +203,53 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
       // Анимация ниже — только для обычной ходьбы по земле; во время
       // полёта/вождения персонаж либо невидим, либо не имитирует шаги.
       setAnimState('idle')
+      return
+    }
+
+    // Скилл - отдельная ветка ДО автомата Idle/Walk/Run ниже (тот же
+    // приём early-return, что у godMode/isDriving выше), сам автомат не
+    // трогается вообще. Пока скилл активен, физическое движение уже
+    // заморожено (EMPTY_MOVEMENT выше) - персонаж "замирает" на месте,
+    // не скользя, пока проигрывается анимация.
+    if (activeSkillId) {
+      if (activeSkillIdRef.current !== activeSkillId) {
+        // Новый скилл - ищем клип по реестру ТЕКУЩЕЙ модели (не у всех
+        // моделей есть скиллы вообще - hero.glb/hero-walk.glb, например).
+        activeSkillIdRef.current = activeSkillId
+        const skillDef = resolveHeroModel(selectedHeroId).skills?.find((s) => s.id === activeSkillId)
+        const action = skillDef
+          ? (Object.entries(actions).find(([name]) => skillDef.clipPattern.test(name))?.[1] ?? null)
+          : null
+        if (action) {
+          walkAction.current?.fadeOut(FADE_DURATION)
+          runAction.current?.fadeOut(FADE_DURATION)
+          // clampWhenFinished - свойство THREE.AnimationAction, не метод
+          // (в отличие от fadeIn/setLoop/play, которые цепочкой).
+          action.clampWhenFinished = true
+          action.reset().setLoop(THREE.LoopOnce, 1).fadeIn(FADE_DURATION).play()
+          skillActionRef.current = action
+          animStateRef.current = 'skill'
+        } else {
+          // У выбранной модели нет такого скилла (например, переключились
+          // на hero.glb прямо во время попытки станцевать) - просто
+          // завершаем немедленно, ничего не проигрывая.
+          useSkillStore.getState().clearSkill()
+          activeSkillIdRef.current = null
+        }
+      } else if (skillActionRef.current) {
+        const clip = skillActionRef.current.getClip()
+        if (skillActionRef.current.time >= clip.duration - 0.02) {
+          skillActionRef.current.fadeOut(FADE_DURATION)
+          skillActionRef.current = null
+          activeSkillIdRef.current = null
+          // Следующий кадр уже без activeSkillId - обычный автомат
+          // Idle/Walk/Run ниже сработает сам и корректно проиграет fadeIn
+          // (animStateRef.current сейчас 'skill', гарантированно НЕ равно
+          // следующему целевому состоянию - setAnimState не сделает
+          // ранний no-op возврат).
+          useSkillStore.getState().clearSkill()
+        }
+      }
       return
     }
 
