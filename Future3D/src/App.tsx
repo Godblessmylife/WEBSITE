@@ -9,6 +9,7 @@ import { Nav } from '@/components/Nav'
 import { AboutSection } from '@/components/AboutSection'
 import { PortfolioCarousel } from '@/components/PortfolioCarousel'
 import { PortfolioGallery } from '@/components/PortfolioGallery'
+import { PortfolioCardDetail } from '@/components/PortfolioCardDetail'
 import { PricingSection } from '@/components/PricingSection'
 import { ContactSection } from '@/components/ContactSection'
 import { GameEntry } from '@/components/GameEntry'
@@ -101,6 +102,7 @@ export function App() {
       )}
 
       {isGalleryOpen && <PortfolioGallery />}
+      <PortfolioCardDetail />
 
       {/* Тюнер путешествия (шестерёнка в левом нижнем углу) убран по
           повторной просьбе клиента - сам компонент (JourneyTuner.tsx)

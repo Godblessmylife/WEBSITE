@@ -6,7 +6,7 @@ import { Environment, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
-import { useGalleryStore } from '@/utils/galleryStore'
+import { useCardDetailStore } from '@/utils/cardDetailStore'
 import { useGameStore } from '@/utils/gameStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useInView } from '@/hooks/useInView'
@@ -19,7 +19,18 @@ interface DragState {
   lastX: number
   lastTime: number
   velocity: number
+  // startX/wasDrag - различение тапа по карточке от свайпа-вращения.
+  // startX запоминается на pointerDown, wasDrag считается на pointerUp
+  // (до того, как браузер сгенерирует последующий click) - Card.onClick
+  // читает этот флаг и игнорирует клик, если это было вращение, а не тап.
+  startX: number
+  wasDrag: boolean
 }
+
+// Порог в пикселях - меньше него движение считается тапом по карточке,
+// больше - вращением карусели (по отзыву клиента: свайп-вращение не
+// должно случайно открывать карточку под пальцем в момент отпускания).
+const DRAG_TAP_THRESHOLD = 6
 
 // Скорость, к которой скорость вращения плавно возвращается сама (лёгкое
 // фоновое вращение, когда карусель никто не трогает) - было раньше
@@ -42,19 +53,24 @@ const SPIN_DECAY_RATE = 2.6
 // скорость вращения.
 const MAX_SPIN_VELOCITY = 4.5
 
-// Двойной клик по карточке — открыть 3D-галерею проектов (см.
-// PortfolioGallery.tsx). stopPropagation не нужен: onDoubleClick — это
-// отдельное синтетическое событие R3F, drag-вращение карусели слушает
-// onPointerDown/Move/Up на самом Canvas и живёт своей жизнью независимо.
-function Card({ index }: { index: number }) {
+// Одиночный тап по карточке — открыть тематическое окно с описанием
+// (PortfolioCardDetail.tsx). Раньше был onDoubleClick на общую галерею
+// (PortfolioGallery.tsx, остаётся нетронутой, просто больше не вызывается
+// отсюда) — по отзыву клиента заменено на конкретное окно под каждую
+// карточку. dragRef.current.wasDrag выставляется в onPointerUp на самом
+// Canvas ДО того, как браузер сгенерирует этот click — если движение с
+// момента pointerDown превысило порог, это было вращение карусели, а не
+// тап, и клик по карточке игнорируется (см. DRAG_TAP_THRESHOLD выше).
+function Card({ index, dragRef }: { index: number; dragRef: RefObject<DragState> }) {
   const angle = (index / CARD_COUNT) * Math.PI * 2
   const theme = THEMES[index % THEMES.length]
   const texture = useMemo(() => createThemeTexture(theme), [theme])
-  const openGallery = useGalleryStore((s) => s.setOpen)
+  const openCard = useCardDetailStore((s) => s.openCard)
 
-  const onDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    openGallery(true)
+    if (dragRef.current.wasDrag) return
+    openCard(index)
   }
 
   return (
@@ -64,11 +80,11 @@ function Card({ index }: { index: number }) {
     >
       {/* зеркальная рамка: высокий metalness + низкий roughness +
           окружение (Environment) дают настоящее отражение сцены вокруг */}
-      <mesh onDoubleClick={onDoubleClick}>
+      <mesh onClick={onClick}>
         <boxGeometry args={[1.7, 2.3, 0.06]} />
         <meshStandardMaterial color="#eef2f6" metalness={1} roughness={0.06} envMapIntensity={1.5} />
       </mesh>
-      <mesh position={[0, 0, 0.035]} onDoubleClick={onDoubleClick}>
+      <mesh position={[0, 0, 0.035]} onClick={onClick}>
         <planeGeometry args={[1.5, 2.1]} />
         <meshStandardMaterial map={texture} metalness={0.1} roughness={0.4} />
       </mesh>
@@ -104,7 +120,7 @@ function Carousel({
   return (
     <group ref={groupRef} scale={scale}>
       {THEMES.map((_, i) => (
-        <Card key={i} index={i} />
+        <Card key={i} index={i} dragRef={dragRef} />
       ))}
     </group>
   )
@@ -120,7 +136,14 @@ export function PortfolioCarousel() {
   // мобильном (см. подробности в JourneyScene.tsx).
   const isGameActive = useGameStore((s) => s.isGameActive)
   const isMobile = useIsMobileViewport()
-  const dragRef = useRef<DragState>({ active: false, lastX: 0, lastTime: 0, velocity: IDLE_VELOCITY })
+  const dragRef = useRef<DragState>({
+    active: false,
+    lastX: 0,
+    lastTime: 0,
+    velocity: IDLE_VELOCITY,
+    startX: 0,
+    wasDrag: false,
+  })
   const rotationRef = useRef(0)
   // Canvas отложен до приближения к области видимости - см. useInView.ts
   // и общее объяснение проблемы в JourneyScene.tsx (все Canvas-секции
@@ -132,6 +155,7 @@ export function PortfolioCarousel() {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     dragRef.current.active = true
     dragRef.current.lastX = e.clientX
+    dragRef.current.startX = e.clientX
     dragRef.current.lastTime = performance.now()
   }
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -157,6 +181,9 @@ export function PortfolioCarousel() {
   }
   const onPointerUp = () => {
     dragRef.current.active = false
+    // Считается ДО click, который браузер сгенерирует следующим - Card
+    // читает этот флаг в своём onClick (см. комментарий у Card выше).
+    dragRef.current.wasDrag = Math.abs(dragRef.current.lastX - dragRef.current.startX) > DRAG_TAP_THRESHOLD
   }
 
   return (
