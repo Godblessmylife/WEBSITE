@@ -355,6 +355,12 @@ export function ParticleHeading() {
           opacity={0}
           depthWrite={false}
           toneMapped={false}
+          // По отзыву клиента "надпись серая вместо белой" - обычный
+          // туман сцены (тот же, что уже явно отключён на Земле в
+          // EarthPlanet.tsx и на часах в FloatingClock.tsx, см. их
+          // комментарии) подмешивал в белый цвет частиц цвет тумана,
+          // визуально давая грязно-серый оттенок вместо чистого белого.
+          fog={false}
         />
       </points>
     </group>

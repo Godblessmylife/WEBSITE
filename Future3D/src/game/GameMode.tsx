@@ -115,6 +115,7 @@ export function GameMode() {
   // оба способа управления одним и тем же пальцем разом работать не
   // могут - явный переключатель отдаёт приоритет одному из двух.
   const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
+  const setMoveModeEnabled = useCraftStore((s) => s.setMoveModeEnabled)
   // Кирка/стройка лестницами (Дополнение 3) - кнопка-точка входа в HUD
   // убрана по просьбе клиента (Дополнение 4, заменена на "Профиль"), но
   // сам стор/рендер поставленных блоков не удалён - см. подробный
@@ -494,10 +495,14 @@ export function GameMode() {
 
       {/* "Профиль" (Дополнение 4) - заменила кнопку "Кирка" в этом месте
           HUD по просьбе клиента. Открывает ProfilePanel.tsx: вращаемое
-          3D-превью персонажа, смена модели, кнопки скиллов. Рядом -
-          "Скиллы" (та же анимация, что и в профиле, но на живом
-          персонаже прямо на карте) и "Приблизить" (камера ближе к лицу,
-          см. cameraZoomStore.ts/GameCamera.tsx). */}
+          3D-превью персонажа, смена модели. Рядом - "Скиллы" (та же
+          анимация, что и в профиле, но на живом персонаже прямо на
+          карте), "Приблизить" (камера ближе к лицу, см.
+          cameraZoomStore.ts/GameCamera.tsx) и "Курсор" (персонаж стоит
+          на месте, можно спокойно двигать/масштабировать объекты карты -
+          см. подробный комментарий в PlayerCharacter.tsx). flexWrap - на
+          узких мобильных экранах 4 кнопки подряд не помещаются в одну
+          строку, переносятся на вторую, а не обрезаются краем экрана. */}
       {isLoaded && (
         <div
           style={{
@@ -505,7 +510,9 @@ export function GameMode() {
             bottom: `calc(${edgeInset} + env(safe-area-inset-bottom))`,
             left: `calc(${edgeInset} + env(safe-area-inset-left))`,
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '0.5rem',
+            maxWidth: 'calc(100vw - 2 * ' + edgeInset + ')',
             zIndex: 1001,
           }}
         >
@@ -527,6 +534,24 @@ export function GameMode() {
             👤 Профиль
           </button>
           <SkillsButton style={{ position: 'relative' }} />
+          <button
+            onClick={() => setMoveModeEnabled(!moveModeEnabled)}
+            style={{
+              padding: btnPadding,
+              minHeight: btnMinHeight,
+              background: moveModeEnabled ? 'rgba(95, 212, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
+              border: '1px solid rgba(95, 212, 255, 0.7)',
+              borderRadius: '999px',
+              color: moveModeEnabled ? '#04121c' : '#5fd4ff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: btnFontSize,
+              fontWeight: moveModeEnabled ? 700 : 400,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            🖱️ Курсор
+          </button>
           <button
             onClick={toggleCameraZoom}
             style={{

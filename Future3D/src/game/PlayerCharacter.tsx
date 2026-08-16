@@ -11,6 +11,7 @@ import { useDriveStore } from '@/utils/driveStore'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
 import { resolveHeroModel, WALK_CLIP_PATTERN } from '@/utils/heroModels'
 import { useSkillStore } from '@/utils/skillStore'
+import { useCraftStore } from '@/utils/craftStore'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -80,7 +81,7 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   const selectedHeroId = useHeroSelectionStore((s) => s.selectedHeroId)
   const heroModelUrl = resolveHeroModel(selectedHeroId).url
   const { scene, animations } = useGLTF(heroModelUrl)
-  const { actions } = useAnimations(animations, scene)
+  const { actions, mixer } = useAnimations(animations, scene)
   const isDriving = useDriveStore((s) => !!s.drivingId)
   const tiltRef = useRef<THREE.Group>(null!)
   const yawRef = useRef(0)
@@ -114,6 +115,25 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     }
     animStateRef.current = 'idle'
   }, [actions])
+
+  // Завершение одноразового скилла (LoopOnce) - стандартное событие
+  // THREE.AnimationMixer, а не ручная проверка action.time в useFrame
+  // (см. подробный комментарий у ветки скилла ниже про то, почему это
+  // важно при просевшем FPS). mixer один на всю модель - события
+  // приходят по ВСЕМ экшнам сразу, поэтому сверяем e.action именно с
+  // тем, что запустили сами, а не просто "какой-то клип закончился".
+  useEffect(() => {
+    const handleFinished = (e: { action: ReturnType<typeof useAnimations>['actions'][string] }) => {
+      const current = skillActionRef.current
+      if (!current || e.action !== current) return
+      current.fadeOut(FADE_DURATION)
+      skillActionRef.current = null
+      activeSkillIdRef.current = null
+      useSkillStore.getState().clearSkill()
+    }
+    mixer.addEventListener('finished', handleFinished)
+    return () => mixer.removeEventListener('finished', handleFinished)
+  }, [mixer])
 
   // Переключение между Idle/Walk/Run - вызывается только при СМЕНЕ
   // состояния (см. вызовы ниже), а не каждый кадр: crossFadeTo несёт
@@ -180,13 +200,25 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     const moveJoystick = useJoystickStore.getState().joysticks.move ?? EMPTY_JOYSTICK
     // Скилл (Дополнение 4) - активируется кнопкой в HUD (GameMode.tsx).
     const activeSkillId = useSkillStore.getState().activeSkillId
+    // Курсор/режим "передвинуть предмет" (Дополнение 5, кнопка в HUD) -
+    // по отзыву клиента "нажал на курсор - персонаж стоит, но можно
+    // двигать/масштабировать любой 3D-объект". Сама возможность
+    // двигать/масштабировать объекты уже работает всегда через наведение
+    // (Grabbable.tsx) - здесь только останавливаем ФИЗИЧЕСКОЕ движение
+    // персонажа, чтобы он не убегал/не мешал прицельно кликать по
+    // объектам. moveModeEnabled - тот же флаг, что уже отключает джойстик
+    // на мобильном (craftStore.ts) ради того, чтобы касания доходили до
+    // объектов, а не перехватывались зоной джойстика - теперь он же
+    // дополнительно замораживает и клавиатурное/джойстик-движение.
+    const cursorMode = useCraftStore.getState().moveModeEnabled
 
-    // В God Mode/за рулём/во время скилла Ecctrl не должен пытаться сам
-    // ходить/прыгать/поворачивать персонажа обычным способом — передаём
-    // ему "все клавиши отпущены", а не читаем джойстик/jump, иначе
-    // несколько систем управления телом будут конкурировать одновременно.
+    // В God Mode/за рулём/во время скилла/в режиме курсора Ecctrl не
+    // должен пытаться сам ходить/прыгать/поворачивать персонажа обычным
+    // способом — передаём ему "все клавиши отпущены", а не читаем
+    // джойстик/jump, иначе несколько систем управления телом будут
+    // конкурировать одновременно.
     handle.setMovement(
-      godMode || isDriving || activeSkillId
+      godMode || isDriving || activeSkillId || cursorMode
         ? EMPTY_MOVEMENT
         : {
             forward: keys.forward,
@@ -199,9 +231,10 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
           },
     )
 
-    if (godMode || isDriving) {
+    if (godMode || isDriving || cursorMode) {
       // Анимация ниже — только для обычной ходьбы по земле; во время
-      // полёта/вождения персонаж либо невидим, либо не имитирует шаги.
+      // полёта/вождения/режима курсора персонаж либо невидим, либо
+      // просто стоит на месте (Idle), не имитирует шаги.
       setAnimState('idle')
       return
     }
@@ -236,20 +269,17 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
           useSkillStore.getState().clearSkill()
           activeSkillIdRef.current = null
         }
-      } else if (skillActionRef.current) {
-        const clip = skillActionRef.current.getClip()
-        if (skillActionRef.current.time >= clip.duration - 0.02) {
-          skillActionRef.current.fadeOut(FADE_DURATION)
-          skillActionRef.current = null
-          activeSkillIdRef.current = null
-          // Следующий кадр уже без activeSkillId - обычный автомат
-          // Idle/Walk/Run ниже сработает сам и корректно проиграет fadeIn
-          // (animStateRef.current сейчас 'skill', гарантированно НЕ равно
-          // следующему целевому состоянию - setAnimState не сделает
-          // ранний no-op возврат).
-          useSkillStore.getState().clearSkill()
-        }
       }
+      // Завершение клипа отслеживается событием 'finished' у mixer (см.
+      // useEffect ниже), а не сравнением action.time >= duration здесь -
+      // при просевшем FPS (замечено в headless-тестах этой сессии, FPS:1)
+      // один кадр может дать очень большую delta, и ручная проверка "время
+      // >= длительности" рисковала бы либо сработать раньше, чем клип
+      // реально успел хоть чуть-чуть отыграться на экране, либо, наоборот,
+      // проскочить порог мимо проверки в кадрах со скачком времени.
+      // Событие mixer'а не зависит от величины delta - оно физически не
+      // может сработать до того, как THREE.AnimationMixer сам определит
+      // клип завершённым.
       return
     }
 
