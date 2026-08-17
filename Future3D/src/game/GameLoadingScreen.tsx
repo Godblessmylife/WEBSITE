@@ -88,10 +88,36 @@ export function GameLoadingScreen() {
         ))}
       </div>
 
+      {/* Угловые скобки sci-fi HUD-рамки (Дополнение 6, визуальное усиление
+          по просьбе клиента "начальную загрузку игры покруче") - чисто
+          декоративные, статичные, не несут новой информации сверх уже
+          существующего текста/процента ниже. */}
+      {[
+        { top: '4%', left: '4%', rotate: 0 },
+        { top: '4%', right: '4%', rotate: 90 },
+        { bottom: '4%', right: '4%', rotate: 180 },
+        { bottom: '4%', left: '4%', rotate: 270 },
+      ].map((corner, i) => (
+        <div
+          key={i}
+          className="warp-corner"
+          style={{
+            position: 'absolute',
+            top: corner.top,
+            left: corner.left,
+            right: corner.right,
+            bottom: corner.bottom,
+            transform: `rotate(${corner.rotate}deg)`,
+          }}
+        />
+      ))}
+
       <div style={{ position: 'relative', width: '132px', height: '132px' }}>
         <div className="warp-ring warp-ring-outer" />
+        <div className="warp-ring warp-ring-mid" />
         <div className="warp-ring warp-ring-inner" />
         <div className="warp-core" />
+        <div className="warp-scanline" />
         <div
           style={{
             position: 'absolute',
@@ -168,8 +194,15 @@ export function GameLoadingScreen() {
         .warp-ring-outer {
           border-top-color: #5fd4ff;
           border-right-color: rgba(95, 212, 255, 0.3);
-          box-shadow: 0 0 30px rgba(95, 212, 255, 0.45);
+          box-shadow: 0 0 42px rgba(95, 212, 255, 0.6);
           animation: warp-spin 1.1s linear infinite;
+        }
+        .warp-ring-mid {
+          inset: 10px;
+          border-left-color: #935cff;
+          border-bottom-color: rgba(147, 92, 255, 0.35);
+          box-shadow: 0 0 24px rgba(147, 92, 255, 0.5);
+          animation: warp-spin 1.9s linear infinite;
         }
         .warp-ring-inner {
           inset: 20px;
@@ -195,6 +228,41 @@ export function GameLoadingScreen() {
         @keyframes warp-core-pulse {
           0%, 100% { transform: scale(0.85); opacity: 0.75; }
           50% { transform: scale(1.15); opacity: 1; }
+        }
+
+        /* Тонкая горизонтальная "сканирующая" линия, проходящая сквозь
+           кольца сверху вниз и обратно - чисто декоративный sci-fi акцент,
+           clip-path кольцом ограничивает её видимой областью колец. */
+        .warp-scanline {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .warp-scanline::after {
+          content: '';
+          position: absolute;
+          left: -20%;
+          right: -20%;
+          height: 3px;
+          background: linear-gradient(90deg, transparent, #eafcff 50%, transparent);
+          box-shadow: 0 0 14px 2px rgba(234, 252, 255, 0.85);
+          animation: warp-scan-move 1.8s ease-in-out infinite;
+        }
+        @keyframes warp-scan-move {
+          0% { top: 2%; opacity: 0; }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { top: 96%; opacity: 0; }
+        }
+
+        .warp-corner {
+          width: 34px;
+          height: 34px;
+          border-top: 2px solid rgba(95, 212, 255, 0.65);
+          border-left: 2px solid rgba(95, 212, 255, 0.65);
+          filter: drop-shadow(0 0 6px rgba(95, 212, 255, 0.5));
         }
 
         .warp-text {
