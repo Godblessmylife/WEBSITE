@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
-import { Environment, Stars } from '@react-three/drei'
+import { Environment } from '@react-three/drei'
 import * as THREE from 'three'
 import cityHdri from '@pmndrs/assets/hdri/city.exr'
 import { THEMES, createThemeTexture } from '@/utils/themeTexture'
@@ -10,7 +10,6 @@ import { useCardDetailStore } from '@/utils/cardDetailStore'
 import { useGameStore } from '@/utils/gameStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useInView } from '@/hooks/useInView'
-import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -194,10 +193,14 @@ export function PortfolioCarousel() {
       style={{
         height: '100vh',
         position: 'relative',
-        // Единый фон для всех секций от "О разработчике" и до конца
-        // страницы - см. sectionBackdrop.ts (Дополнение 5, устраняет швы
-        // на границах между секциями).
-        background: SECTION_BACKDROP,
+        // Фон убран отсюда - по отзыву клиента "у карусели словно
+        // отдельный фон" (свой Canvas со своими случайными звёздами
+        // поверх ЕЩЁ ОДНОГО, уже смонтированного позади всей страницы
+        // GlobalBackdrop.tsx - два независимых звёздных поля с разными
+        // случайными позициями точек и разной фазой вращения читались
+        // как заметный шов/дубль). Секция теперь прозрачна, как и
+        // остальные - GlobalBackdrop просвечивает сквозь неё насквозь,
+        // виден и между карточками, и позади них.
       }}
     >
       {inView && (
@@ -218,13 +221,11 @@ export function PortfolioCarousel() {
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
       >
-        {/* лёгкий "игровое меню" фон вместо сплошной черноты: звёзды +
-            мягкое туманное затемнение к краям кадра. Параметры выровнены
-            с SectionStarfield.tsx (Дополнение 5) - визуально то же самое
-            звёздное поле, что и в соседних DOM-секциях, без добавления
-            второго Canvas в эту секцию (тут уже есть свой интерактивный,
-            плюс ещё один означал бы лишний WebGL-контекст). */}
-        <Stars radius={60} depth={40} count={3500} factor={3.5} saturation={0} fade speed={0.6} />
+        {/* Свои звёзды здесь больше не нужны - GlobalBackdrop.tsx уже
+            даёт звёздное поле позади всей секции (Canvas ниже прозрачный
+            там, где нет карточек/тумана - см. комментарий у style секции
+            выше). Туман остался - влияет на цвет самих карточек на
+            заднем плане карусели, не на фон. */}
         <fog attach="fog" args={['#0a1120', 8, 26]} />
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
