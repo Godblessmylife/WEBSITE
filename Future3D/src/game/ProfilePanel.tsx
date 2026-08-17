@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useAnimations, useGLTF } from '@react-three/drei'
@@ -72,6 +72,25 @@ const buttonStyle: CSSProperties = {
   touchAction: 'manipulation',
 }
 
+// Та же статическая POS-ссылка и тот же способ её открывать, что уже
+// используется в PricingSection.tsx для тарифов (клиент явно подтвердил
+// переиспользовать этот паттерн для разблокировки героя) - у неё нет
+// способа заранее подставить конкретную сумму/товар, а у сайта нет
+// бэкенда, который мог бы проверить оплату и что-то реально разблокировать.
+// Это декоративная витрина будущей модели, а не рабочая покупка - явно
+// говорим об этом ограничении, а не скрываем его.
+const PAYMENT_URL = 'https://pay.trybit.com/pos/kYtzJrJtRPNnPzsG'
+const openPayment = () => window.open(PAYMENT_URL, '_blank', 'noopener,noreferrer')
+
+const tabButtonStyle: CSSProperties = {
+  padding: '0.5rem 1.1rem',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: '0.8rem',
+  borderRadius: '999px',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
+}
+
 // Окно "Профиль" - заменило кнопку "Кирка" в HUD (Дополнение 4).
 // Показывает только выбор персонажа + вращаемое превью - кнопки скиллов
 // отсюда убраны по отзыву клиента ("кнопку скиллов отдельно, не в
@@ -82,6 +101,10 @@ export function ProfilePanel() {
   const setOpen = useProfileStore((s) => s.setOpen)
   const selectedHeroId = useHeroSelectionStore((s) => s.selectedHeroId)
   const setSelectedHero = useHeroSelectionStore((s) => s.setSelectedHero)
+  // Дополнение 6 - вторая вкладка "Ещё герои" рядом с обычным выбором
+  // персонажа: декоративная витрина будущей модели за $9.99 (см.
+  // PAYMENT_URL выше).
+  const [tab, setTab] = useState<'roster' | 'more'>('roster')
 
   if (!isOpen) return null
 
@@ -129,88 +152,173 @@ export function ProfilePanel() {
         ✕
       </button>
 
-      <div
-        style={{
-          width: 'min(90vw, 480px)',
-          height: 'min(58vh, 480px)',
-          borderRadius: '16px',
-          overflow: 'hidden',
-          border: '1px solid rgba(255, 215, 106, 0.4)',
-          background: 'radial-gradient(circle at 50% 30%, #182a45 0%, #05070d 80%)',
-        }}
-      >
-        {/* key на id модели - полный ремонт Canvas-содержимого при смене
-            персонажа проще и надёжнее, чем вручную сбрасывать состояние
-            useGLTF/useAnimations на смену url. */}
-        <Canvas key={model.id} camera={{ position: [0, targetY + 0.15, cameraDistance], fov: 45 }}>
-          <ambientLight intensity={0.7} />
-          <directionalLight position={[3, 5, 4]} intensity={1.3} />
-          <pointLight position={[0, 2, 1]} color="#5fd4ff" intensity={1.5} distance={6} />
-          <PreviewModel url={model.url} />
-          <OrbitControls
-            target={[0, targetY, 0]}
-            enablePan={false}
-            minDistance={cameraDistance * 0.6}
-            maxDistance={cameraDistance * 1.8}
-            minPolarAngle={Math.PI / 5}
-            maxPolarAngle={Math.PI / 1.7}
-          />
-        </Canvas>
+      {/* Переключатель вкладок (Дополнение 6) - "Ещё герои" рядом с
+          обычным выбором персонажа. */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem' }}>
+        <button
+          onClick={() => setTab('roster')}
+          style={{
+            ...tabButtonStyle,
+            background: tab === 'roster' ? 'rgba(95, 212, 255, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+            border: tab === 'roster' ? '1px solid rgba(95, 212, 255, 0.9)' : '1px solid rgba(255, 255, 255, 0.2)',
+            color: tab === 'roster' ? '#5fd4ff' : '#eafcff',
+          }}
+        >
+          Герои
+        </button>
+        <button
+          onClick={() => setTab('more')}
+          style={{
+            ...tabButtonStyle,
+            background: tab === 'more' ? 'rgba(255, 215, 106, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+            border: tab === 'more' ? '1px solid rgba(255, 215, 106, 0.9)' : '1px solid rgba(255, 255, 255, 0.2)',
+            color: tab === 'more' ? '#ffe9b0' : '#eafcff',
+          }}
+        >
+          ❔ Ещё герои
+        </button>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          marginTop: '1rem',
-          maxWidth: 'min(90vw, 480px)',
-        }}
-      >
-        {HERO_MODELS.map((m) => {
-          const active = m.id === selectedHeroId
-          return (
-            <button
-              key={m.id}
-              onClick={() => setSelectedHero(m.id)}
+      {tab === 'roster' && (
+        <>
+          <div
+            style={{
+              width: 'min(90vw, 480px)',
+              height: 'min(58vh, 480px)',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 215, 106, 0.4)',
+              background: 'radial-gradient(circle at 50% 30%, #182a45 0%, #05070d 80%)',
+            }}
+          >
+            {/* key на id модели - полный ремонт Canvas-содержимого при смене
+                персонажа проще и надёжнее, чем вручную сбрасывать состояние
+                useGLTF/useAnimations на смену url. */}
+            <Canvas key={model.id} camera={{ position: [0, targetY + 0.15, cameraDistance], fov: 45 }}>
+              <ambientLight intensity={0.7} />
+              <directionalLight position={[3, 5, 4]} intensity={1.3} />
+              <pointLight position={[0, 2, 1]} color="#5fd4ff" intensity={1.5} distance={6} />
+              <PreviewModel url={model.url} />
+              <OrbitControls
+                target={[0, targetY, 0]}
+                enablePan={false}
+                minDistance={cameraDistance * 0.6}
+                maxDistance={cameraDistance * 1.8}
+                minPolarAngle={Math.PI / 5}
+                maxPolarAngle={Math.PI / 1.7}
+              />
+            </Canvas>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginTop: '1rem',
+              maxWidth: 'min(90vw, 480px)',
+            }}
+          >
+            {HERO_MODELS.map((m) => {
+              const active = m.id === selectedHeroId
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedHero(m.id)}
+                  style={{
+                    ...buttonStyle,
+                    background: active ? 'rgba(255, 215, 106, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                    border: active ? '1px solid rgba(255, 215, 106, 0.9)' : '1px solid rgba(255, 255, 255, 0.2)',
+                    color: active ? '#ffe9b0' : '#eafcff',
+                  }}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Явная кнопка подтверждения - по отзыву клиента "нет кнопки
+              подтвердить". Выбор модели уже применяется мгновенно по клику
+              выше (та же модель сразу видна и в превью, и на живом
+              персонаже) - эта кнопка не меняет логику выбора, а даёт
+              понятное "готово, закрыть" действие вместо неявного клика по
+              крестику в углу. */}
+          <button
+            onClick={() => setOpen(false)}
+            style={{
+              marginTop: '1rem',
+              padding: '0.6rem 1.6rem',
+              minHeight: '2.75rem',
+              background: 'rgba(255, 215, 106, 0.85)',
+              border: '1px solid #ffe9b0',
+              borderRadius: '999px',
+              color: '#241300',
+              fontFamily: "'Orbitron', sans-serif",
+              fontWeight: 700,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            Подтвердить выбор
+          </button>
+        </>
+      )}
+
+      {tab === 'more' && (
+        <>
+          <div
+            style={{
+              width: 'min(90vw, 480px)',
+              height: 'min(58vh, 480px)',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              border: '1px solid rgba(147, 92, 255, 0.4)',
+              background: 'radial-gradient(circle at 50% 30%, #241a45 0%, #05070d 80%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1rem',
+              padding: '1.5rem',
+              textAlign: 'center',
+            }}
+          >
+            <div
               style={{
-                ...buttonStyle,
-                background: active ? 'rgba(255, 215, 106, 0.25)' : 'rgba(255, 255, 255, 0.06)',
-                border: active ? '1px solid rgba(255, 215, 106, 0.9)' : '1px solid rgba(255, 255, 255, 0.2)',
-                color: active ? '#ffe9b0' : '#eafcff',
+                fontFamily: "'Orbitron', sans-serif",
+                fontSize: '5rem',
+                fontWeight: 700,
+                color: '#d7c3ff',
+                textShadow: '0 0 24px rgba(147, 92, 255, 0.85), 0 0 48px rgba(147, 92, 255, 0.5)',
               }}
             >
-              {m.label}
+              ?
+            </div>
+            <div style={{ color: '#c8b8ff', fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', maxWidth: '22rem' }}>
+              Новый герой уже готовится. Разблокируйте доступ, чтобы узнать, кто это.
+            </div>
+            <button
+              onClick={openPayment}
+              style={{
+                padding: '0.65rem 1.4rem',
+                minHeight: '2.75rem',
+                background: 'rgba(147, 92, 255, 0.85)',
+                border: '1px solid #d7c3ff',
+                borderRadius: '999px',
+                color: '#0c0518',
+                fontFamily: "'Orbitron', sans-serif",
+                fontWeight: 700,
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+              }}
+            >
+              Разблокировать - $9.99
             </button>
-          )
-        })}
-      </div>
-
-      {/* Явная кнопка подтверждения - по отзыву клиента "нет кнопки
-          подтвердить". Выбор модели уже применяется мгновенно по клику
-          выше (та же модель сразу видна и в превью, и на живом
-          персонаже) - эта кнопка не меняет логику выбора, а даёт
-          понятное "готово, закрыть" действие вместо неявного клика по
-          крестику в углу. */}
-      <button
-        onClick={() => setOpen(false)}
-        style={{
-          marginTop: '1rem',
-          padding: '0.6rem 1.6rem',
-          minHeight: '2.75rem',
-          background: 'rgba(255, 215, 106, 0.85)',
-          border: '1px solid #ffe9b0',
-          borderRadius: '999px',
-          color: '#241300',
-          fontFamily: "'Orbitron', sans-serif",
-          fontWeight: 700,
-          cursor: 'pointer',
-          touchAction: 'manipulation',
-        }}
-      >
-        Подтвердить выбор
-      </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
