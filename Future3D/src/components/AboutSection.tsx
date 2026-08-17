@@ -1,6 +1,3 @@
-import { SectionStarfield } from './SectionStarfield'
-import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
-
 const SERVICES = [
   { title: 'Веб-сайты и лендинги', desc: 'От визитки до сложного многостраничного сайта — быстро, адаптивно, без шаблонов.' },
   { title: '3D и интерактив', desc: 'Сцены, анимации, погружение — как то, через что вы только что пролетели.' },
@@ -18,13 +15,16 @@ export function AboutSection() {
         display: 'flex',
         alignItems: 'center',
         padding: '6rem 1.5rem',
-        // Единый фон для всех секций от этой и до конца страницы - см.
-        // sectionBackdrop.ts (Дополнение 5, устраняет швы между секциями).
-        background: SECTION_BACKDROP,
+        // Фон убран отсюда - секция теперь часть ЕДИНОГО фона на весь
+        // остаток страницы (см. GlobalBackdrop.tsx, смонтирован один раз
+        // в App.tsx и стоит НЕПОДВИЖНО position:fixed позади всех секций
+        // от этой и до конца страницы) - раньше здесь был свой Canvas
+        // (SectionStarfield) и свой CSS-градиент, которые
+        // монтировались/гасли по границе секции и давали заметное
+        // "мигание" фона при скролле (отзыв клиента).
         overflow: 'hidden',
       }}
     >
-      <SectionStarfield />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', width: '100%' }}>
         {/* По центру и крупнее, со свечением - тот же приём, что у
             "КОНТАКТЫ"/"ЦЕНЫ", по явной просьбе клиента. Остальной блок

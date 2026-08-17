@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { SectionStarfield } from './SectionStarfield'
-import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 
 // Готовая, статическая страница оплаты (Trybit/CryptoCloud, POS-ссылка) -
 // без бэкенда: секретный API-ключ платёжного шлюза НЕ используется нигде
@@ -157,16 +155,15 @@ export function PricingSection() {
         display: 'flex',
         alignItems: 'center',
         padding: '6rem 1.5rem',
-        // Единый фон для всех секций от "О разработчике" и до конца
-        // страницы - см. sectionBackdrop.ts (Дополнение 5). Раньше центр
+        // Фон убран отсюда - см. подробный комментарий в AboutSection.tsx:
+        // теперь один общий GlobalBackdrop.tsx на весь остаток страницы,
+        // а не свой Canvas+градиент на каждую секцию (раньше центр
         // градиента этой секции стоял на 50% 80% - светлый тон оказывался
-        // прямо у нижнего края, ровно на стыке с "Контакты" (клиент
-        // отметил крестиками на скриншоте) - главная причина шва.
-        background: SECTION_BACKDROP,
+        // прямо у нижнего края, ровно на стыке с "Контакты", который
+        // клиент отметил крестиками на скриншоте).
         overflow: 'hidden',
       }}
     >
-      <SectionStarfield />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
         {/* Крупнее, со свечением - тот же приём, что у "КОНТАКТЫ"
             (ContactSection.tsx), по просьбе клиента "надпись цены тоже

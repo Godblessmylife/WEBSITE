@@ -21,7 +21,7 @@ import { ScrollHint } from '@/components/ScrollHint'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
-import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
+import { GlobalBackdrop } from '@/components/GlobalBackdrop'
 import './styles/globals.css'
 
 // GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
@@ -72,30 +72,24 @@ export function App() {
         </div>
       </div>
 
+      {/* GlobalBackdrop - ОДИН неподвижный (position:fixed) анимированный
+          фон на весь остаток страницы, смонтирован здесь один раз и
+          дальше сам решает, когда появиться (когда читатель приблизится
+          к About) - подробности и история бага ("фон мигает/пропадает
+          при скролле") см. в самом компоненте. Секции ниже (About/
+          Portfolio/Pricing/Contact/GameEntry) больше НЕ красят фон сами -
+          он один на всех, они просто прозрачно лежат поверх него в
+          обычном потоке страницы. */}
+      <GlobalBackdrop />
+
       {/* Реальный контент лендинга — раньше после 3D-путешествия шли
           только карусель и игра, ни слова о том, что делает разработчик,
           сколько это стоит и как с ним связаться. */}
       <AboutSection />
       <PortfolioCarousel />
       <PricingSection />
-      {/* Общий фон на обе секции - раньше у ContactSection и GameEntry
-          были свои отдельные radial-gradient (разные центры/цвета), и на
-          стыке между ними был заметный шов. По просьбе клиента "сделай
-          одно целое" - один непрерывный градиент на обёртке вместо двух
-          на каждой секции по отдельности (сами секции больше не красят
-          фон, см. их комментарии). Теперь та же формула, что и у ВСЕХ
-          секций от "О разработчике" (см. sectionBackdrop.ts, Дополнение
-          5) - швов между About/Portfolio/Pricing/Contact+GameEntry
-          больше нет нигде, не только между этими двумя. */}
-      <div
-        style={{
-          position: 'relative',
-          background: SECTION_BACKDROP,
-        }}
-      >
-        <ContactSection />
-        <GameEntry />
-      </div>
+      <ContactSection />
+      <GameEntry />
 
       {isGameActive && (
         <GameErrorBoundary onExit={() => setGameActive(false)}>

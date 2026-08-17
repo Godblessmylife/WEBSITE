@@ -1,5 +1,4 @@
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
-import { SectionStarfield } from './SectionStarfield'
 
 const TELEGRAM_HANDLE = 'web3elchapo'
 const WHATSAPP_NUMBER = '18296057621'
@@ -103,14 +102,14 @@ export function ContactSection() {
         justifyContent: 'center',
         textAlign: 'center',
         padding: '6rem 1.5rem',
-        // Фон убран отсюда - секция теперь часть общего непрерывного фона
-        // с GameEntry (см. обёртку в App.tsx): раньше у каждой секции был
-        // свой отдельный radial-gradient, и на стыке между ними была
-        // заметная граница/шов по просьбе клиента "сделай одно целое".
+        // Фон убран отсюда - вся секция теперь часть ЕДИНОГО фона на
+        // остаток страницы (см. GlobalBackdrop.tsx, подробности в
+        // AboutSection.tsx) - свой Canvas (SectionStarfield) здесь тоже
+        // больше не нужен, устранял бы такой же смысл, что и общий фон,
+        // но со своим независимым циклом монтирования/размонтирования.
         overflow: 'hidden',
       }}
     >
-      <SectionStarfield />
       {/* Крупнее и с свечением, в отличие от такого же на вид маленького
           "эйбрау"-лейбла у остальных секций (О нас/Портфолио/Цены) -
           по явной просьбе клиента выделить именно "Контакты" как
