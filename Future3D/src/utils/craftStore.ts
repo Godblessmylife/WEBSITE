@@ -104,11 +104,28 @@ interface CraftState {
   movingOriginalY: number | null
   overrides: Record<string, ObjectOverride>
   moveModeEnabled: boolean
+  // Дополнение 6 - "липкий" выбор объекта для новой единой нижней панели
+  // ObjectToolbar.tsx, которая больше не рисуется самим Grabbable.tsx
+  // (была своя всплывающая панель НАД объектом - по отзыву клиента
+  // "трудно поймать курсором, убегает при наведении на саму панель").
+  // hoveredId выставляется при наведении, но НЕ сбрасывается сам по себе,
+  // когда курсор уходит с объекта - иначе он гарантированно сбросился бы
+  // раньше, чем курсор долетит от объекта до панели внизу экрана
+  // (физически далеко), воспроизводя ту же жалобу в новом месте. Сброс -
+  // только явный: клик по пустому месту карты (GameMode.tsx) или
+  // наведение на ДРУГОЙ объект (перезаписывает значение). defaultPositions
+  // - реестр, наполняется каждым Grabbable при монтировании (см.
+  // registerDefaultPosition) - без него ObjectToolbar не знал бы, куда
+  // откатывать масштаб для объекта, у которого ещё нет override.
+  hoveredId: string | null
+  defaultPositions: Record<string, [number, number, number]>
   startMoving: (id: string, y: number) => void
   place: (id: string, position: [number, number, number]) => void
   cancelMoving: () => void
   setScale: (id: string, defaultPosition: [number, number, number], scale: number) => void
   setMoveModeEnabled: (enabled: boolean) => void
+  setHoveredId: (id: string | null) => void
+  registerDefaultPosition: (id: string, position: [number, number, number]) => void
 }
 
 export const useCraftStore = create<CraftState>((set) => ({
@@ -116,6 +133,8 @@ export const useCraftStore = create<CraftState>((set) => ({
   movingOriginalY: null,
   overrides: loadOverrides(),
   moveModeEnabled: loadMoveModeEnabled(),
+  hoveredId: null,
+  defaultPositions: {},
   // Не подхватывает второй объект, пока первый ещё не поставлен -
   // одновременно двигать можно только что-то одно.
   startMoving: (id, y) => set((s) => (s.movingId ? {} : { movingId: id, movingOriginalY: y })),
@@ -139,6 +158,13 @@ export const useCraftStore = create<CraftState>((set) => ({
     saveMoveModeEnabled(enabled)
     set({ moveModeEnabled: enabled })
   },
+  // Защита от гонки (у Grabbable.tsx скрытие идёт с задержкой 220мс, см.
+  // scheduleHidePanel там) сделана СО СТОРОНЫ ВЫЗЫВАЮЩЕГО: перед сбросом
+  // в null он сам проверяет, что hoveredId всё ещё равен именно его id -
+  // здесь просто безусловная запись.
+  setHoveredId: (id) => set({ hoveredId: id }),
+  registerDefaultPosition: (id, position) =>
+    set((s) => ({ defaultPositions: { ...s.defaultPositions, [id]: position } })),
 }))
 
 // Живая точка на земле, куда сейчас смотрит курсор - отдельный vanilla-

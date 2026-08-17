@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode, CSSProperties } from 'react'
+import type { ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import { RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
-import { useCraftStore, craftGhostStore, MIN_SCALE, MAX_SCALE } from '@/utils/craftStore'
+import { useCraftStore, craftGhostStore } from '@/utils/craftStore'
 import { useDriveStore } from '@/utils/driveStore'
 
 // Оборачивает любую постройку MapProps.tsx в "берущийся" объект - БЕЗ
@@ -40,80 +39,15 @@ import { useDriveStore } from '@/utils/driveStore'
 // в каком-то отдельном режиме) - раньше это было ключевой причиной
 // вообще городить отдельный тумблер "режим CRAFT", сейчас в нём просто
 // нет нужды.
+// Дополнение 6: панель "Переместить/масштаб" больше НЕ рисуется здесь -
+// по отзыву клиента она была спроецирована в 3D над объектом (drei
+// <Html>) и "убегала", когда курсор двигался к ней самой (onPointerOut
+// хитбокса срабатывал раньше, чем курсор долетал до кнопок). Вся эта
+// панель (стили/press-and-hold масштаба) переехала в единую фиксированную
+// нижнюю ObjectToolbar.tsx, которая не привязана к экранной проекции
+// объекта и поэтому не может "убежать". Grabbable.tsx теперь только
+// определяет hover/move и сообщает об этом в craftStore.ts (hoveredId).
 const HIDE_DELAY_MS = 220
-
-const panelStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '0.55rem',
-  padding: '0.6rem 0.85rem',
-  background: 'rgba(10, 17, 32, 0.88)',
-  border: '1px solid rgba(95, 212, 255, 0.55)',
-  borderRadius: '14px',
-  fontFamily: "'Orbitron', sans-serif",
-  whiteSpace: 'nowrap',
-  pointerEvents: 'auto',
-  cursor: 'default',
-}
-
-const moveButtonStyle: CSSProperties = {
-  padding: '0.35rem 1rem',
-  background: 'rgba(95, 212, 255, 0.2)',
-  border: '1px solid rgba(95, 212, 255, 0.75)',
-  borderRadius: '999px',
-  color: '#eafcff',
-  fontFamily: "'Orbitron', sans-serif",
-  fontSize: '0.72rem',
-  cursor: 'pointer',
-  touchAction: 'manipulation',
-}
-
-const scaleRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-}
-
-const scalePercentStyle: CSSProperties = {
-  color: '#c8ecff',
-  fontSize: '0.68rem',
-  minWidth: '2.6rem',
-  textAlign: 'center',
-}
-
-// Кнопки +/- рядом со слайдером - по отзыву клиента: на телефоне точно
-// попасть пальцем в нужную точку узкого слайдера сложно, а дискретный
-// шаг кнопкой - нет. Слайдер остаётся (удобен на десктопе с мышью), а
-// кнопки - для точной подстройки одним тапом на любом устройстве.
-const SCALE_STEP = 0.1
-// Крупнее прежних 1.6rem - по отзыву клиента "удобнее увеличение и
-// уменьшение", особенно пальцем на телефоне.
-const resizeButtonStyle: CSSProperties = {
-  width: '2.1rem',
-  height: '2.1rem',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 0,
-  background: 'rgba(95, 212, 255, 0.15)',
-  border: '1px solid rgba(95, 212, 255, 0.6)',
-  borderRadius: '50%',
-  color: '#eafcff',
-  fontFamily: "'Orbitron', sans-serif",
-  fontSize: '1.05rem',
-  lineHeight: 1,
-  cursor: 'pointer',
-  touchAction: 'manipulation',
-}
-
-// Удержание кнопки +/- быстро повторяет шаг вместо одного тапа за раз -
-// по отзыву клиента "удобнее... увеличение и уменьшение", особенно
-// когда нужно подогнать размер сильно отличающийся от текущего.
-// HOLD_START_DELAY_MS - короткая пауза перед началом повтора, чтобы
-// обычный быстрый тап не успевал зацепить лишний повтор.
-const HOLD_START_DELAY_MS = 350
-const HOLD_REPEAT_MS = 80
 
 export function Grabbable({
   id,
@@ -144,49 +78,26 @@ export function Grabbable({
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dragGroupRef = useRef<THREE.Group>(null!)
   const scaleGroupRef = useRef<THREE.Group>(null!)
-  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Реестр "родных" позиций объектов (craftStore.ts, defaultPositions) -
+  // нужен единой ObjectToolbar.tsx, у которой нет собственного пропа
+  // defaultPosition для КАЖДОГО объекта карты. Регистрируется один раз на
+  // id - defaultPosition для данного объекта по смыслу не меняется за
+  // время его жизни (меняются только overrides поверх него).
+  useEffect(() => {
+    useCraftStore.getState().registerDefaultPosition(id, defaultPosition)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   useEffect(
     () => () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
-      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current)
-      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current)
+      // Объект размонтировался, пока был наведён (например, машина уехала
+      // из-под курсора) - не оставляем чужой id висеть в сторе навсегда.
+      if (useCraftStore.getState().hoveredId === id) useCraftStore.getState().setHoveredId(null)
     },
-    [],
+    [id],
   )
-
-  const stopScaleHold = () => {
-    if (holdTimeoutRef.current) {
-      clearTimeout(holdTimeoutRef.current)
-      holdTimeoutRef.current = null
-    }
-    if (holdIntervalRef.current) {
-      clearInterval(holdIntervalRef.current)
-      holdIntervalRef.current = null
-    }
-  }
-
-  // Один шаг сразу (обычный тап), затем после паузы - быстрый повтор,
-  // пока кнопка удержана. Читает АКТУАЛЬНОЕ значение из стора на каждый
-  // шаг (не замыкает scaleMultiplier из рендера), иначе повтор применял
-  // бы один и тот же шаг к устаревшему значению.
-  const startScaleHold = (step: number) => {
-    stopScaleHold()
-    const applyStep = () => {
-      const current = useCraftStore.getState().overrides[id]?.scale ?? 1
-      useCraftStore.getState().setScale(id, defaultPosition, current + step)
-      // На границе диапазона останавливаем повтор сами - если кнопка
-      // между тем стала disabled (см. проп ниже), она может перестать
-      // получать pointerup/pointerleave, и интервал остался бы висеть
-      // до размонтирования компонента.
-      if (current + step <= MIN_SCALE || current + step >= MAX_SCALE) stopScaleHold()
-    }
-    applyStep()
-    holdTimeoutRef.current = setTimeout(() => {
-      holdIntervalRef.current = setInterval(applyStep, HOLD_REPEAT_MS)
-    }, HOLD_START_DELAY_MS)
-  }
 
   // Сброс курсора, когда перенос закончился (пока он идёт, useFrame ниже
   // каждый кадр держит его 'grabbing' сам, независимо от hover).
@@ -194,17 +105,27 @@ export function Grabbable({
     if (!isMoving) document.body.style.cursor = hovered ? 'pointer' : 'auto'
   }, [isMoving, hovered])
 
+  // hoveredId в сторе - теперь "липкий" выбор объекта для ObjectToolbar.tsx
+  // (единая нижняя панель), а НЕ сиюминутное состояние наведения: он
+  // выставляется здесь сразу при наведении, но НЕ сбрасывается автоматом
+  // при уходе курсора с объекта. Раньше именно это "не пропадать" не
+  // соблюдалось - когда курсор уходил с объекта К САМОЙ панели (она внизу
+  // экрана, физически далеко от объекта), 220мс-таймер успевал сбросить
+  // выбор раньше, чем курсор долетал до кнопок - воспроизводило ту же
+  // жалобу клиента ("трудно поймать"), просто в новом месте. Явный сброс
+  // выбора - клик по пустому месту карты (GameMode.tsx, onPointerMissed)
+  // или наведение на ДРУГОЙ объект (тогда сюда просто придёт новый id).
   const showPanel = () => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current)
       hideTimeoutRef.current = null
     }
     setHovered(true)
+    useCraftStore.getState().setHoveredId(id)
   }
-  // Небольшая задержка перед скрытием панели - без неё увести курсор с
-  // хитбокса модели НА САМУ панель (которая висит чуть выше) было бы
-  // невозможно: onPointerOut срабатывал бы раньше, чем курсор долетит до
-  // кнопок, и панель бы исчезала прямо под курсором.
+  // Задержка здесь влияет ТОЛЬКО на локальный визуальный "bounce"
+  // (scaleGroupRef ниже) и курсор мыши - косметика самого объекта, не
+  // связана с видимостью ObjectToolbar.tsx.
   const scheduleHidePanel = () => {
     hideTimeoutRef.current = setTimeout(() => setHovered(false), HIDE_DELAY_MS)
   }
@@ -245,11 +166,11 @@ export function Grabbable({
   }
 
   // По просьбе клиента: двойной клик/тап сразу хватает объект - не нужно
-  // сперва наводить курсор и жать кнопку "Переместить" в панели. Кнопка
-  // в панели никуда не делась (быстрый способ на десктопе, доступ к
-  // масштабу) - это ДОПОЛНИТЕЛЬНЫЙ, более быстрый способ того же самого
-  // действия (startMoving сам по себе не даёт схватить второй объект,
-  // пока первый не поставлен - см. craftStore.ts).
+  // сперва наводить курсор и жать "Переместить" в ObjectToolbar.tsx. Кнопка
+  // там никуда не делась (доступна, когда включён режим "Курсор") - это
+  // ДОПОЛНИТЕЛЬНЫЙ, более быстрый способ того же самого действия
+  // (startMoving сам по себе не даёт схватить второй объект, пока первый
+  // не поставлен - см. craftStore.ts).
   const onHitboxDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     if (isMoving || anyoneMoving) return
@@ -278,66 +199,6 @@ export function Grabbable({
               <boxGeometry args={hitboxSize} />
               <meshBasicMaterial visible={false} />
             </mesh>
-          )}
-          {/* Панель теперь видна и ПОКА объект переносят (isMoving), не
-              только на hover - по отзыву клиента "удобнее перемещение и
-              увеличение/уменьшение": раньше во время самого переноса
-              панель пропадала (anyoneMoving было true), и изменить размер
-              можно было только ПОСЛЕ того, как объект уже поставлен на
-              место. Для остальных объектов, пока что-то ДРУГОЕ переносят,
-              ограничение !anyoneMoving сохранено - двигать/менять размер
-              можно только чему-то одному одновременно. */}
-          {(isMoving || (hovered && !anyoneMoving)) && (
-            <Html
-              position={[hitboxCenter[0], hitboxCenter[1] + hitboxSize[1] / 2 + 0.5, hitboxCenter[2]]}
-              center
-              distanceFactor={8}
-            >
-              <div style={panelStyle} onMouseEnter={showPanel} onMouseLeave={scheduleHidePanel}>
-                <button
-                  style={moveButtonStyle}
-                  onClick={() => useCraftStore.getState().startMoving(id, position[1])}
-                >
-                  Переместить
-                </button>
-                <div style={scaleRowStyle}>
-                  <button
-                    style={resizeButtonStyle}
-                    onPointerDown={() => startScaleHold(-SCALE_STEP)}
-                    onPointerUp={stopScaleHold}
-                    onPointerLeave={stopScaleHold}
-                    onPointerCancel={stopScaleHold}
-                    disabled={scaleMultiplier <= MIN_SCALE}
-                    aria-label="Уменьшить"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="range"
-                    min={50}
-                    max={200}
-                    step={5}
-                    value={Math.round(scaleMultiplier * 100)}
-                    onChange={(e) =>
-                      useCraftStore.getState().setScale(id, defaultPosition, Number(e.currentTarget.value) / 100)
-                    }
-                    style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '72px' }}
-                  />
-                  <button
-                    style={resizeButtonStyle}
-                    onPointerDown={() => startScaleHold(SCALE_STEP)}
-                    onPointerUp={stopScaleHold}
-                    onPointerLeave={stopScaleHold}
-                    onPointerCancel={stopScaleHold}
-                    disabled={scaleMultiplier >= MAX_SCALE}
-                    aria-label="Увеличить"
-                  >
-                    +
-                  </button>
-                  <span style={scalePercentStyle}>{Math.round(scaleMultiplier * 100)}%</span>
-                </div>
-              </div>
-            </Html>
           )}
         </group>
       </group>

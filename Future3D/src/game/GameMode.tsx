@@ -16,6 +16,7 @@ import { CraftModeController } from './CraftModeController'
 import { PlacedBlocks } from './PlacedBlocks'
 import { useProfileStore } from '@/utils/profileStore'
 import { ProfilePanel } from './ProfilePanel'
+import { ObjectToolbar } from './ObjectToolbar'
 import { SkillsButton } from './SkillsButton'
 import { useCameraZoomStore } from '@/utils/cameraZoomStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
@@ -211,11 +212,19 @@ export function GameMode() {
       return
     }
 
-    const { movingId, movingOriginalY } = useCraftStore.getState()
-    if (!movingId || movingOriginalY === null) return
+    const craftState = useCraftStore.getState()
+    const { movingId, movingOriginalY } = craftState
+    if (!movingId || movingOriginalY === null) {
+      // Клик мимо всех объектов, пока ничего не двигают - в режиме
+      // "Курсор" это снимает текущий "липкий" выбор объекта в
+      // ObjectToolbar.tsx (см. craftStore.ts) - иначе панель внизу экрана
+      // не имела бы способа закрыться, кроме наведения на другой объект.
+      if (craftState.hoveredId) craftState.setHoveredId(null)
+      return
+    }
     const ghost = craftGhostStore.getState()
     if (!ghost.visible) return
-    useCraftStore.getState().place(movingId, [ghost.x, movingOriginalY, ghost.z])
+    craftState.place(movingId, [ghost.x, movingOriginalY, ghost.z])
   }
 
   return (
@@ -620,6 +629,7 @@ export function GameMode() {
           <QuestDialogue />
           <TeleportEffect />
           <ProfilePanel />
+          <ObjectToolbar />
         </>
       )}
 
