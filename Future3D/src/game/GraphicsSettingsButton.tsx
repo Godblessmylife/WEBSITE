@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
+import { useGraphicsQualityStore, MIN_FOV, MAX_FOV, MIN_DRAW_DISTANCE_MULTIPLIER, MAX_DRAW_DISTANCE_MULTIPLIER } from '@/utils/graphicsQualityStore'
 import type { GraphicsQuality } from '@/utils/graphicsQualityStore'
 import { useCraftStore } from '@/utils/craftStore'
 
@@ -53,6 +53,12 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
   const [open, setOpen] = useState(false)
   const quality = useGraphicsQualityStore((s) => s.quality)
   const setQuality = useGraphicsQualityStore((s) => s.setQuality)
+  const fov = useGraphicsQualityStore((s) => s.fov)
+  const setFov = useGraphicsQualityStore((s) => s.setFov)
+  const drawDistanceMultiplier = useGraphicsQualityStore((s) => s.drawDistanceMultiplier)
+  const setDrawDistanceMultiplier = useGraphicsQualityStore((s) => s.setDrawDistanceMultiplier)
+  const shadowsEnabled = useGraphicsQualityStore((s) => s.shadowsEnabled)
+  const setShadowsEnabled = useGraphicsQualityStore((s) => s.setShadowsEnabled)
   const moveModeEnabled = useCraftStore((s) => s.moveModeEnabled)
   const setMoveModeEnabled = useCraftStore((s) => s.setMoveModeEnabled)
 
@@ -129,6 +135,78 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
               {QUALITY_LABELS[q]}
             </button>
           ))}
+
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '0.3rem 0' }} />
+
+          {/* Дополнение 6 - по просьбе клиента "настройки графики более
+              подробные, что-то на подобии WoW/GTA6" - три реально
+              влияющих на картинку параметра (не декоративные заглушки). */}
+          <span
+            style={{
+              color: '#9db2c9',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.6rem',
+              letterSpacing: '0.05em',
+              marginBottom: '0.15rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            УГОЛ ОБЗОРА (FOV): {fov}°
+          </span>
+          <input
+            type="range"
+            min={MIN_FOV}
+            max={MAX_FOV}
+            step={1}
+            value={fov}
+            onChange={(e) => setFov(Number(e.currentTarget.value))}
+            style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '100%' }}
+          />
+
+          <span
+            style={{
+              color: '#9db2c9',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.6rem',
+              letterSpacing: '0.05em',
+              margin: '0.3rem 0 0.15rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ДАЛЬНОСТЬ ПРОРИСОВКИ: {Math.round(drawDistanceMultiplier * 100)}%
+          </span>
+          <input
+            type="range"
+            min={MIN_DRAW_DISTANCE_MULTIPLIER * 100}
+            max={MAX_DRAW_DISTANCE_MULTIPLIER * 100}
+            step={5}
+            value={Math.round(drawDistanceMultiplier * 100)}
+            onChange={(e) => setDrawDistanceMultiplier(Number(e.currentTarget.value) / 100)}
+            style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '100%' }}
+          />
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.4rem 0.6rem',
+              marginTop: '0.2rem',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={shadowsEnabled}
+              onChange={(e) => setShadowsEnabled(e.currentTarget.checked)}
+              style={{ width: '1rem', height: '1rem', accentColor: '#5fd4ff', cursor: 'pointer' }}
+            />
+            <span style={{ color: '#eafcff', fontFamily: "'Orbitron', sans-serif", fontSize: '0.68rem' }}>
+              Тени {shadowsEnabled ? 'включены' : 'выключены'}
+            </span>
+          </label>
 
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '0.3rem 0' }} />
 

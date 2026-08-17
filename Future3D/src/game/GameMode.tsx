@@ -96,6 +96,9 @@ export function GameMode() {
   const reduced = useGamePerfStore((s) => s.reduced)
   const setReduced = useGamePerfStore((s) => s.setReduced)
   const quality = useGraphicsQualityStore((s) => s.quality)
+  const graphicsFov = useGraphicsQualityStore((s) => s.fov)
+  const drawDistanceMultiplier = useGraphicsQualityStore((s) => s.drawDistanceMultiplier)
+  const shadowsEnabled = useGraphicsQualityStore((s) => s.shadowsEnabled)
   const setLogOpen = useQuestStore((s) => s.setLogOpen)
   const isLogOpen = useQuestStore((s) => s.isLogOpen)
   const godModeActive = useGodModeStore((s) => s.active)
@@ -236,7 +239,11 @@ export function GameMode() {
           с castShadow, так что без теней мир не станет менее читаемым. */}
       <Canvas
         key={canvasKey}
-        camera={{ fov: 60, near: 0.1, far: CAMERA_FAR }}
+        // fov и far (Дополнение 6, GraphicsSettingsButton.tsx) - реально
+        // влияющие на картинку настройки, а не декоративные: far растёт
+        // вместе с множителем дальности прорисовки поверх дефолта
+        // CAMERA_FAR из worldConstants.ts (сама константа не меняется).
+        camera={{ fov: graphicsFov, near: 0.1, far: CAMERA_FAR * drawDistanceMultiplier }}
         // reduced (живой fps действительно проседает, AdaptivePerformance)
         // всегда переопределяет ручной выбор качества вниз до минимума -
         // это подстраховка от реального зависания, а не человеческий
@@ -245,7 +252,7 @@ export function GameMode() {
         // всех устройств - см. подробности в gamePerfStore.ts про то,
         // почему у игры СВОЙ отдельный стор, а не общий с лендингом).
         dpr={reduced ? 1 : DPR_BY_QUALITY[quality]}
-        shadows={quality !== 'low' && !reduced}
+        shadows={quality !== 'low' && !reduced && shadowsEnabled}
         onPointerMissed={handleCanvasPointerMissed}
         onCreated={({ gl }) => {
           gl.domElement.addEventListener('webglcontextlost', (event) => {
@@ -282,7 +289,7 @@ export function GameMode() {
         {/* far - см. worldConstants.ts (FOG_FAR), увеличен вместе с
             площадкой (WORLD_HALF_EXTENT) — далёкие объекты карты должны
             быть видны, а не тонуть в тумане раньше времени. */}
-        <fog attach="fog" args={['#0a1120', 20, FOG_FAR]} />
+        <fog attach="fog" args={['#0a1120', 20, FOG_FAR * drawDistanceMultiplier]} />
         <Suspense
           fallback={
             <Html center>

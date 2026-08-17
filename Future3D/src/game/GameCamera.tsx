@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -6,6 +6,8 @@ import type { EcctrlHandle } from 'ecctrl'
 import { useTeleportStore } from '@/utils/teleportStore'
 import { useDriveStore, driveLiveStore } from '@/utils/driveStore'
 import { useCameraZoomStore } from '@/utils/cameraZoomStore'
+import { useGraphicsQualityStore } from '@/utils/graphicsQualityStore'
+import { CAMERA_FAR } from './worldConstants'
 
 // Вид от третьего лица "как в ГТА" — позади и чуть выше персонажа. За
 // рулём машины камера чуть дальше отъезжает назад (машина "длиннее"
@@ -31,6 +33,24 @@ export function GameCamera({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | 
   const { camera } = useThree()
   const initializedRef = useRef(false)
   const lastSnapNonceRef = useRef(useTeleportStore.getState().snapNonce)
+  const fov = useGraphicsQualityStore((s) => s.fov)
+  const drawDistanceMultiplier = useGraphicsQualityStore((s) => s.drawDistanceMultiplier)
+
+  // БАГ, найденный при проверке настроек (Дополнение 6): проп
+  // camera={{fov, far}} у <Canvas> (GameMode.tsx) применяется react-three-
+  // fiber'ом ТОЛЬКО в момент создания камеры - при последующих изменениях
+  // самого значения (без сопутствующего ресайза окна, который отдельно
+  // дёргает updateCamera()) новая проекционная матрица не пересчитывается,
+  // и слайдеры FOV/дальности прорисовки в GraphicsSettingsButton.tsx
+  // визуально ничего не меняли бы. Явный ручной пересчёт здесь - тот же
+  // приём, что рекомендует сама документация r3f для "живых" изменений
+  // камеры вне создания Canvas.
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return
+    camera.fov = fov
+    camera.far = CAMERA_FAR * drawDistanceMultiplier
+    camera.updateProjectionMatrix()
+  }, [camera, fov, drawDistanceMultiplier])
 
   useFrame((_, delta) => {
     // Пока за рулём (CarDriving.tsx) - камера следует за машиной
