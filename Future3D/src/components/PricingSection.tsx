@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SectionStarfield } from './SectionStarfield'
+import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 
 // Готовая, статическая страница оплаты (Trybit/CryptoCloud, POS-ссылка) -
 // без бэкенда: секретный API-ключ платёжного шлюза НЕ используется нигде
@@ -156,7 +157,12 @@ export function PricingSection() {
         display: 'flex',
         alignItems: 'center',
         padding: '6rem 1.5rem',
-        background: 'radial-gradient(circle at 50% 80%, #101a2e 0%, #05070d 70%)',
+        // Единый фон для всех секций от "О разработчике" и до конца
+        // страницы - см. sectionBackdrop.ts (Дополнение 5). Раньше центр
+        // градиента этой секции стоял на 50% 80% - светлый тон оказывался
+        // прямо у нижнего края, ровно на стыке с "Контакты" (клиент
+        // отметил крестиками на скриншоте) - главная причина шва.
+        background: SECTION_BACKDROP,
         overflow: 'hidden',
       }}
     >

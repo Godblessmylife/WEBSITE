@@ -1,4 +1,5 @@
 import { SectionStarfield } from './SectionStarfield'
+import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 
 const SERVICES = [
   { title: 'Веб-сайты и лендинги', desc: 'От визитки до сложного многостраничного сайта — быстро, адаптивно, без шаблонов.' },
@@ -17,7 +18,9 @@ export function AboutSection() {
         display: 'flex',
         alignItems: 'center',
         padding: '6rem 1.5rem',
-        background: 'radial-gradient(circle at 50% 20%, #101a2e 0%, #05070d 70%)',
+        // Единый фон для всех секций от этой и до конца страницы - см.
+        // sectionBackdrop.ts (Дополнение 5, устраняет швы между секциями).
+        background: SECTION_BACKDROP,
         overflow: 'hidden',
       }}
     >

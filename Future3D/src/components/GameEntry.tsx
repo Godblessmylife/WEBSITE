@@ -229,8 +229,9 @@ export function GameEntry() {
         // вокруг. maxDistance у OrbitControls ниже тоже уменьшен, чтобы
         // зум колёсиком не мог отдалить обратно к старому дальнему кадру.
         <Canvas camera={{ position: [0, 2.1, 4.3], fov: 45 }} style={{ touchAction: 'none' }}>
-          {/* тот же "игровое меню" фон, что и под карточками портфолио */}
-          <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
+          {/* тот же "игровое меню" фон, что и под карточками портфолио -
+              параметры выровнены с SectionStarfield.tsx (Дополнение 5). */}
+          <Stars radius={60} depth={40} count={3500} factor={3.5} saturation={0} fade speed={0.6} />
           <fog attach="fog" args={['#0a1120', 10, 30]} />
 
           <ambientLight intensity={0.6} />

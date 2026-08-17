@@ -21,6 +21,7 @@ import { ScrollHint } from '@/components/ScrollHint'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
+import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 import './styles/globals.css'
 
 // GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
@@ -82,11 +83,14 @@ export function App() {
           стыке между ними был заметный шов. По просьбе клиента "сделай
           одно целое" - один непрерывный градиент на обёртке вместо двух
           на каждой секции по отдельности (сами секции больше не красят
-          фон, см. их комментарии). */}
+          фон, см. их комментарии). Теперь та же формула, что и у ВСЕХ
+          секций от "О разработчике" (см. sectionBackdrop.ts, Дополнение
+          5) - швов между About/Portfolio/Pricing/Contact+GameEntry
+          больше нет нигде, не только между этими двумя. */}
       <div
         style={{
           position: 'relative',
-          background: 'radial-gradient(circle at 50% 25%, #182a45 0%, #0a1120 45%, #05070d 85%)',
+          background: SECTION_BACKDROP,
         }}
       >
         <ContactSection />

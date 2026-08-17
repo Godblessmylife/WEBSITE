@@ -10,6 +10,7 @@ import { useCardDetailStore } from '@/utils/cardDetailStore'
 import { useGameStore } from '@/utils/gameStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useInView } from '@/hooks/useInView'
+import { SECTION_BACKDROP } from '@/utils/sectionBackdrop'
 
 const CARD_COUNT = 5
 const CARD_RADIUS = 3.4
@@ -193,8 +194,10 @@ export function PortfolioCarousel() {
       style={{
         height: '100vh',
         position: 'relative',
-        background:
-          'radial-gradient(circle at 50% 38%, #182a45 0%, #0a1120 45%, #05070d 85%)',
+        // Единый фон для всех секций от "О разработчике" и до конца
+        // страницы - см. sectionBackdrop.ts (Дополнение 5, устраняет швы
+        // на границах между секциями).
+        background: SECTION_BACKDROP,
       }}
     >
       {inView && (
@@ -216,8 +219,12 @@ export function PortfolioCarousel() {
         onPointerLeave={onPointerUp}
       >
         {/* лёгкий "игровое меню" фон вместо сплошной черноты: звёзды +
-            мягкое туманное затемнение к краям кадра */}
-        <Stars radius={60} depth={30} count={2500} factor={3} saturation={0} fade speed={0.4} />
+            мягкое туманное затемнение к краям кадра. Параметры выровнены
+            с SectionStarfield.tsx (Дополнение 5) - визуально то же самое
+            звёздное поле, что и в соседних DOM-секциях, без добавления
+            второго Canvas в эту секцию (тут уже есть свой интерактивный,
+            плюс ещё один означал бы лишний WebGL-контекст). */}
+        <Stars radius={60} depth={40} count={3500} factor={3.5} saturation={0} fade speed={0.6} />
         <fog attach="fog" args={['#0a1120', 8, 26]} />
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
