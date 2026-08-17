@@ -55,29 +55,39 @@ export function SkillsButton({ style }: { style?: CSSProperties }) {
             minWidth: '170px',
           }}
         >
-          {skills.map((skill) => (
-            <button
-              key={skill.id}
-              onClick={() => {
-                triggerSkill(skill.id)
-                setOpen(false)
-              }}
-              style={{
-                padding: '0.4rem 0.6rem',
-                borderRadius: '8px',
-                border: activeSkillId === skill.id ? '1px solid rgba(95, 212, 255, 0.8)' : '1px solid transparent',
-                background: activeSkillId === skill.id ? 'rgba(95, 212, 255, 0.15)' : 'transparent',
-                color: activeSkillId === skill.id ? '#5fd4ff' : '#eafcff',
-                fontFamily: "'Orbitron', sans-serif",
-                fontSize: '0.72rem',
-                textAlign: 'left',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              {skill.label}
-            </button>
-          ))}
+          {skills.map((skill) => {
+            // Пока какой-то скилл уже играет, клики по ДРУГИМ скиллам в
+            // списке игнорируются (кнопки не задизейблены визуально - тот
+            // же список, чтобы было видно, что именно сейчас играет, но
+            // выбрать что-то другое поверх нельзя) - вторая защита поверх
+            // фикса в PlayerCharacter.tsx: сама возможность наложить два
+            // скилла друг на друга больше не возникает.
+            const isBlocked = !!activeSkillId && activeSkillId !== skill.id
+            return (
+              <button
+                key={skill.id}
+                onClick={() => {
+                  if (isBlocked) return
+                  triggerSkill(skill.id)
+                  setOpen(false)
+                }}
+                style={{
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: '8px',
+                  border: activeSkillId === skill.id ? '1px solid rgba(95, 212, 255, 0.8)' : '1px solid transparent',
+                  background: activeSkillId === skill.id ? 'rgba(95, 212, 255, 0.15)' : 'transparent',
+                  color: activeSkillId === skill.id ? '#5fd4ff' : isBlocked ? '#5c6b7a' : '#eafcff',
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: '0.72rem',
+                  textAlign: 'left',
+                  cursor: isBlocked ? 'default' : 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
+                {skill.label}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

@@ -246,6 +246,19 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     // не скользя, пока проигрывается анимация.
     if (activeSkillId) {
       if (activeSkillIdRef.current !== activeSkillId) {
+        // БАГ (по отзыву клиента: "после выбора скилла герой становится
+        // кривым и не ходит") - если кликнуть ВТОРОЙ скилл до того, как
+        // доиграл первый, activeSkillIdRef.current меняется на новый id,
+        // но СТАРЫЙ skillActionRef.current ниже просто перезаписывался
+        // новым значением - старый экшн (уже с clampWhenFinished=true)
+        // навсегда замирал на последнем кадре с весом ~1 (никто не звал
+        // fadeOut), а событие 'finished' от него игнорировалось (см.
+        // handleFinished выше: e.action !== current). THREE.AnimationMixer
+        // не нормализует веса сам - эта забытая поза складывалась поверх
+        // ЛЮБОЙ следующей анимации (ходьба/бег/следующий скилл) навсегда.
+        // Явно гасим предыдущий скилл-экшн, если он ещё есть, ДО того как
+        // ссылка на него потеряется.
+        skillActionRef.current?.fadeOut(FADE_DURATION)
         // Новый скилл - ищем клип по реестру ТЕКУЩЕЙ модели (не у всех
         // моделей есть скиллы вообще - hero.glb/hero-walk.glb, например).
         activeSkillIdRef.current = activeSkillId
