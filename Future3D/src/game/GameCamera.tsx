@@ -72,8 +72,8 @@ export function GameCamera({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | 
       initializedRef.current = false
     }
 
-    const zoomed = useCameraZoomStore.getState().zoomed
-    behind.copy(zoomed ? ZOOM_OFFSET : LOCAL_OFFSET).applyQuaternion(handle.currQuat)
+    const zoomLevel = useCameraZoomStore.getState().zoomLevel
+    behind.copy(LOCAL_OFFSET).lerp(ZOOM_OFFSET, zoomLevel).applyQuaternion(handle.currQuat)
     targetPos.copy(handle.currPos).add(behind)
 
     if (!initializedRef.current) {

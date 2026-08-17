@@ -126,8 +126,8 @@ export function GameMode() {
   const pickaxeActive = useBuildStore((s) => s.pickaxeActive)
   const hasPlacedBlocks = useBuildStore((s) => s.placedBlocks.length > 0)
   const setProfileOpen = useProfileStore((s) => s.setOpen)
-  const cameraZoomed = useCameraZoomStore((s) => s.zoomed)
-  const toggleCameraZoom = useCameraZoomStore((s) => s.toggle)
+  const cameraZoomLevel = useCameraZoomStore((s) => s.zoomLevel)
+  const setCameraZoomLevel = useCameraZoomStore((s) => s.setZoomLevel)
   // По просьбе клиента: игра рассчитана на альбомную ориентацию, узкий
   // портретный экран тесен для джойстиков слева и справа сразу - только
   // для тач-устройств (на десктопе понятие "поворота окна" не имеет
@@ -561,24 +561,38 @@ export function GameMode() {
           >
             🖱️ Курсор
           </button>
-          <button
-            onClick={toggleCameraZoom}
+          {/* Зум-бар (Дополнение 6) - раньше была кнопка вкл/выкл, по
+              отзыву клиента "приближает быстро очень и слишком сверху" -
+              заменена на слайдер в процентах, пользователь сам ведёт
+              значение вместо мгновенного скачка (см. cameraZoomStore.ts/
+              GameCamera.tsx). */}
+          <div
             style={{
               padding: btnPadding,
               minHeight: btnMinHeight,
-              background: cameraZoomed ? 'rgba(147, 92, 255, 0.85)' : 'rgba(10, 17, 32, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: cameraZoomLevel > 0 ? 'rgba(147, 92, 255, 0.35)' : 'rgba(10, 17, 32, 0.6)',
               border: '1px solid rgba(147, 92, 255, 0.7)',
               borderRadius: '999px',
-              color: cameraZoomed ? '#0c0518' : '#d7c3ff',
+              color: '#d7c3ff',
               fontFamily: "'Orbitron', sans-serif",
               fontSize: btnFontSize,
-              fontWeight: cameraZoomed ? 700 : 400,
-              cursor: 'pointer',
-              touchAction: 'manipulation',
             }}
           >
-            🔍 Приблизить
-          </button>
+            <span aria-hidden="true">🔍</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(cameraZoomLevel * 100)}
+              onChange={(e) => setCameraZoomLevel(Number(e.currentTarget.value) / 100)}
+              style={{ accentColor: '#935cff', cursor: 'pointer', width: isMobile ? '70px' : '96px' }}
+            />
+            <span style={{ minWidth: '2.6rem', textAlign: 'center' }}>{Math.round(cameraZoomLevel * 100)}%</span>
+          </div>
         </div>
       )}
 
