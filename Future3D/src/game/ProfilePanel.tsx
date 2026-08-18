@@ -7,6 +7,8 @@ import { clone as cloneSkinnedScene } from 'three/examples/jsm/utils/SkeletonUti
 import { useProfileStore } from '@/utils/profileStore'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
 import { HERO_MODELS, resolveHeroModel, WALK_CLIP_PATTERN } from '@/utils/heroModels'
+import { usePlayerProfileStore } from '@/utils/playerProfileStore'
+import { useGameStore, levelFromScore } from '@/utils/gameStore'
 
 // Целевая высота кадра с запасом сверху/снизу - подобрана под реальный
 // рост Meshy AI-персонажей (~1.7-2 игровых единицы, как и у живого
@@ -101,6 +103,10 @@ export function ProfilePanel() {
   const setOpen = useProfileStore((s) => s.setOpen)
   const selectedHeroId = useHeroSelectionStore((s) => s.selectedHeroId)
   const setSelectedHero = useHeroSelectionStore((s) => s.setSelectedHero)
+  const nickname = usePlayerProfileStore((s) => s.nickname)
+  const setNickname = usePlayerProfileStore((s) => s.setNickname)
+  const totalScore = useGameStore((s) => s.totalScore)
+  const level = levelFromScore(totalScore)
   // Дополнение 6 - вторая вкладка "Ещё герои" рядом с обычным выбором
   // персонажа: декоративная витрина будущей модели за $9.99 (см.
   // PAYMENT_URL выше).
@@ -151,6 +157,35 @@ export function ProfilePanel() {
       >
         ✕
       </button>
+
+      {/* Никнейм + уровень (по просьбе клиента) - никнейм хранится только
+          в этом браузере (нет бэкенда/аккаунтов, см. playerProfileStore.ts),
+          уровень - производная от НАКОПЛЕННОГО счёта (totalScore,
+          gameStore.ts), не сбрасывается между заходами в игру, в отличие
+          от обычного счёта в HUD. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45rem', marginBottom: '1rem' }}>
+        <input
+          type="text"
+          value={nickname}
+          onChange={(e) => setNickname(e.currentTarget.value)}
+          placeholder="Ваш никнейм"
+          maxLength={20}
+          style={{
+            padding: '0.45rem 0.9rem',
+            minWidth: '12rem',
+            textAlign: 'center',
+            background: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            borderRadius: '999px',
+            color: '#eafcff',
+            fontFamily: "'Orbitron', sans-serif",
+            fontSize: '0.85rem',
+          }}
+        />
+        <span style={{ color: '#ffe9b0', fontFamily: "'Orbitron', sans-serif", fontSize: '0.75rem' }}>
+          Уровень {level} · {totalScore} очков всего
+        </span>
+      </div>
 
       {/* Переключатель вкладок (Дополнение 6) - "Ещё герои" рядом с
           обычным выбором персонажа. */}

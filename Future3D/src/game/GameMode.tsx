@@ -17,6 +17,7 @@ import { PlacedBlocks } from './PlacedBlocks'
 import { useProfileStore } from '@/utils/profileStore'
 import { ProfilePanel } from './ProfilePanel'
 import { ObjectToolbar } from './ObjectToolbar'
+import { MusicPlayer } from './MusicPlayer'
 import { SkillsButton } from './SkillsButton'
 import { useCameraZoomStore } from '@/utils/cameraZoomStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
@@ -550,6 +551,7 @@ export function GameMode() {
             👤 Профиль
           </button>
           <SkillsButton style={{ position: 'relative' }} />
+          <MusicPlayer style={{ position: 'relative' }} />
           <button
             onClick={() => setMoveModeEnabled(!moveModeEnabled)}
             style={{

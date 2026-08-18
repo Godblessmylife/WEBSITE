@@ -59,6 +59,10 @@ function saveMoveModeEnabled(enabled: boolean) {
 export interface ObjectOverride {
   position: [number, number, number]
   scale: number
+  // "Повернуть к герою" (по просьбе клиента) - поворот вокруг Y, по
+  // умолчанию 0 (как модель стоит в MapProps.tsx изначально). Не влияет
+  // на позицию/квесты - чисто визуальная ориентация.
+  rotationY: number
 }
 
 function loadOverrides(): Record<string, ObjectOverride> {
@@ -72,12 +76,13 @@ function loadOverrides(): Record<string, ObjectOverride> {
       // масштаб по умолчанию 1, чтобы старые сохранённые расстановки не
       // терялись при обновлении сайта.
       if (Array.isArray(value) && value.length === 3) {
-        result[id] = { position: value as [number, number, number], scale: 1 }
+        result[id] = { position: value as [number, number, number], scale: 1, rotationY: 0 }
       } else if (value && typeof value === 'object' && Array.isArray((value as ObjectOverride).position)) {
         const v = value as Partial<ObjectOverride>
         result[id] = {
           position: v.position as [number, number, number],
           scale: typeof v.scale === 'number' ? v.scale : 1,
+          rotationY: typeof v.rotationY === 'number' ? v.rotationY : 0,
         }
       }
     }
@@ -133,6 +138,7 @@ interface CraftState {
   place: (id: string, position: [number, number, number]) => void
   cancelMoving: () => void
   setScale: (id: string, defaultPosition: [number, number, number], scale: number) => void
+  setRotationY: (id: string, defaultPosition: [number, number, number], rotationY: number) => void
   setMoveModeEnabled: (enabled: boolean) => void
   setHoveredId: (id: string | null) => void
   registerDefaultPosition: (id: string, position: [number, number, number]) => void
@@ -153,7 +159,8 @@ export const useCraftStore = create<CraftState>((set) => ({
   place: (id, position) =>
     set((s) => {
       const prevScale = s.overrides[id]?.scale ?? 1
-      const overrides = { ...s.overrides, [id]: { position, scale: prevScale } }
+      const prevRotationY = s.overrides[id]?.rotationY ?? 0
+      const overrides = { ...s.overrides, [id]: { position, scale: prevScale, rotationY: prevRotationY } }
       saveOverrides(overrides)
       return { movingId: null, movingOriginalY: null, overrides }
     }),
@@ -161,8 +168,17 @@ export const useCraftStore = create<CraftState>((set) => ({
   setScale: (id, defaultPosition, scale) =>
     set((s) => {
       const position = s.overrides[id]?.position ?? defaultPosition
+      const rotationY = s.overrides[id]?.rotationY ?? 0
       const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))
-      const overrides = { ...s.overrides, [id]: { position, scale: clamped } }
+      const overrides = { ...s.overrides, [id]: { position, scale: clamped, rotationY } }
+      saveOverrides(overrides)
+      return { overrides }
+    }),
+  setRotationY: (id, defaultPosition, rotationY) =>
+    set((s) => {
+      const position = s.overrides[id]?.position ?? defaultPosition
+      const scale = s.overrides[id]?.scale ?? 1
+      const overrides = { ...s.overrides, [id]: { position, scale, rotationY } }
       saveOverrides(overrides)
       return { overrides }
     }),

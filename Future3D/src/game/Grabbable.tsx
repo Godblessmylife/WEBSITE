@@ -77,6 +77,7 @@ export function Grabbable({
   const movingId = useCraftStore((s) => s.movingId)
   const position = override?.position ?? defaultPosition
   const scaleMultiplier = override?.scale ?? 1
+  const rotationY = override?.rotationY ?? 0
   const isMoving = movingId === id
   const anyoneMoving = movingId !== null
   // Пока эта же машина "за рулём" (CarDriving.tsx) - её припаркованная
@@ -205,7 +206,7 @@ export function Grabbable({
   return (
     <RigidBody key={position.join(',')} type="fixed" colliders={false} position={position}>
       <group ref={dragGroupRef}>
-        <group ref={scaleGroupRef}>
+        <group ref={scaleGroupRef} rotation={[0, rotationY, 0]}>
           <group visible={!isDriven}>{children}</group>
           {!isDriven && (
             <mesh

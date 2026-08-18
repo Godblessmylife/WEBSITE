@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import { useCraftStore, MIN_SCALE, MAX_SCALE } from '@/utils/craftStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
+import { minimapPlayerStore } from '@/utils/minimapStore'
 
 // Дополнение 6 (по отзыву клиента): раньше кнопка "Переместить" и шкала
 // масштаба рисовались прямо у Grabbable.tsx как drei <Html>, спроецированные
@@ -56,6 +57,24 @@ const scalePercentStyle: CSSProperties = {
   fontSize: '0.68rem',
   minWidth: '2.6rem',
   textAlign: 'center',
+}
+
+// "Повернуть к герою" (по просьбе клиента "модели поворачиваются в
+// направлении куда смотрит герой") - однокликовая привязка поворота
+// объекта к текущей позиции игрока, а не непрерывное автоследование
+// (постоянный авто-разворот выглядел бы странно для статичных построек
+// типа магазина/горы). Доступна для ЛЮБОГО объекта, включая movable=false
+// (Rocket/SlotMachine) - поворот не трогает позицию, квестам не мешает.
+const rotateButtonStyle: CSSProperties = {
+  padding: '0.4rem 0.9rem',
+  background: 'rgba(255, 215, 106, 0.15)',
+  border: '1px solid rgba(255, 215, 106, 0.6)',
+  borderRadius: '999px',
+  color: '#ffe9b0',
+  fontFamily: "'Orbitron', sans-serif",
+  fontSize: '0.72rem',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
 }
 
 const resizeButtonStyle: CSSProperties = {
@@ -164,6 +183,22 @@ export function ObjectToolbar() {
           {isMoving ? 'Переносится...' : 'Переместить'}
         </button>
       )}
+      <button
+        style={rotateButtonStyle}
+        onClick={() => {
+          const hero = minimapPlayerStore.getState()
+          const dx = hero.x - position[0]
+          const dz = hero.z - position[2]
+          // Ничего не делаем, если объект и герой практически в одной
+          // точке - направление становится неопределённым (0/0).
+          if (Math.abs(dx) < 0.001 && Math.abs(dz) < 0.001) return
+          const angle = Math.atan2(dx, dz)
+          const fallbackPosition = defaultPosition ?? [0, 0, 0]
+          useCraftStore.getState().setRotationY(activeId, fallbackPosition, angle)
+        }}
+      >
+        ↻ К герою
+      </button>
       <div style={scaleRowStyle}>
         <button
           style={resizeButtonStyle}
