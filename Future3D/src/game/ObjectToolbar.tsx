@@ -86,6 +86,10 @@ export function ObjectToolbar() {
   const activeId = movingId ?? hoveredId
   const override = useCraftStore((s) => (activeId ? s.overrides[activeId] : undefined))
   const defaultPosition = useCraftStore((s) => (activeId ? s.defaultPositions[activeId] : undefined))
+  // По умолчанию true - объекты, зарегистрированные ДО появления этого
+  // поля (или в принципе без явного movable={false}), остаются
+  // перемещаемыми, как и раньше (см. Grabbable.tsx/craftStore.ts).
+  const isMovable = useCraftStore((s) => (activeId ? (s.movableIds[activeId] ?? true) : true))
   const isMobile = useIsMobileViewport()
 
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -147,17 +151,19 @@ export function ObjectToolbar() {
         bottom: isMobile ? 'calc(7rem + env(safe-area-inset-bottom))' : 'calc(9rem + env(safe-area-inset-bottom))',
       }}
     >
-      <button
-        style={{
-          ...moveButtonStyle,
-          background: isMoving ? 'rgba(95, 212, 255, 0.85)' : moveButtonStyle.background,
-          color: isMoving ? '#04121c' : moveButtonStyle.color,
-        }}
-        disabled={isMoving}
-        onClick={() => useCraftStore.getState().startMoving(activeId, position[1])}
-      >
-        {isMoving ? 'Переносится...' : 'Переместить'}
-      </button>
+      {isMovable && (
+        <button
+          style={{
+            ...moveButtonStyle,
+            background: isMoving ? 'rgba(95, 212, 255, 0.85)' : moveButtonStyle.background,
+            color: isMoving ? '#04121c' : moveButtonStyle.color,
+          }}
+          disabled={isMoving}
+          onClick={() => useCraftStore.getState().startMoving(activeId, position[1])}
+        >
+          {isMoving ? 'Переносится...' : 'Переместить'}
+        </button>
+      )}
       <div style={scaleRowStyle}>
         <button
           style={resizeButtonStyle}

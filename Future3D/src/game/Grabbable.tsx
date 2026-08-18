@@ -54,12 +54,23 @@ export function Grabbable({
   defaultPosition,
   hitboxSize,
   hitboxCenter = [0, 0, 0],
+  movable = true,
+  onClickWhenIdle,
   children,
 }: {
   id: string
   defaultPosition: [number, number, number]
   hitboxSize: [number, number, number]
   hitboxCenter?: [number, number, number]
+  // false - у объекта нет "Переместить" (см. подробный комментарий в
+  // craftStore.ts, movableIds) - масштаб при этом остаётся доступным.
+  movable?: boolean
+  // Даёт объекту СВОЁ поведение по обычному (не двойному) клику, когда
+  // ничего не переносится - например, открыть диалог NPC (QuestNpc.tsx).
+  // Не вызывается, пока что-либо переносится (см. onHitboxClick ниже) -
+  // сохраняет старое правило "клик по любому интерактивному объекту, пока
+  // что-то в руках, ничего не делает, кроме постановки" нетронутым.
+  onClickWhenIdle?: () => void
   children: ReactNode
 }) {
   const override = useCraftStore((s) => s.overrides[id])
@@ -86,8 +97,9 @@ export function Grabbable({
   // время его жизни (меняются только overrides поверх него).
   useEffect(() => {
     useCraftStore.getState().registerDefaultPosition(id, defaultPosition)
+    useCraftStore.getState().registerMovable(id, movable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, movable])
 
   useEffect(
     () => () => {
@@ -154,15 +166,22 @@ export function Grabbable({
 
   const onHitboxClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    if (!isMoving) return
-    // Клик прямо по объекту, который сейчас держим, тоже ставит его -
-    // на случай, если курсор в момент клика окажется точно над моделью.
-    // Основной способ поставить - клик КУДА УГОДНО ещё, см.
-    // onPointerMissed в GameMode.tsx.
-    const ghost = craftGhostStore.getState()
-    if (ghost.visible) {
-      useCraftStore.getState().place(id, [ghost.x, position[1], ghost.z])
+    if (isMoving) {
+      // Клик прямо по объекту, который сейчас держим, тоже ставит его -
+      // на случай, если курсор в момент клика окажется точно над моделью.
+      // Основной способ поставить - клик КУДА УГОДНО ещё, см.
+      // onPointerMissed в GameMode.tsx.
+      const ghost = craftGhostStore.getState()
+      if (ghost.visible) {
+        useCraftStore.getState().place(id, [ghost.x, position[1], ghost.z])
+      }
+      return
     }
+    // anyoneMoving (кто-то ДРУГОЙ сейчас в руках) - клик по этому объекту
+    // не должен ничего открывать, тот же принцип, что уже был у обычного
+    // клика: пока что-то переносится, интерактивные объекты под курсором
+    // молча ничего не делают (ставит только onPointerMissed).
+    if (!anyoneMoving) onClickWhenIdle?.()
   }
 
   // По просьбе клиента: двойной клик/тап сразу хватает объект - не нужно
@@ -173,7 +192,7 @@ export function Grabbable({
   // не поставлен - см. craftStore.ts).
   const onHitboxDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    if (isMoving || anyoneMoving) return
+    if (!movable || isMoving || anyoneMoving) return
     useCraftStore.getState().startMoving(id, position[1])
   }
 

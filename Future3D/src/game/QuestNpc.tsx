@@ -1,63 +1,14 @@
-import { useMemo, useRef, useState } from 'react'
-import type { ThreeEvent } from '@react-three/fiber'
-import type { CSSProperties } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF, Html } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useQuestStore } from '@/utils/questStore'
-import { useCraftStore, MIN_SCALE, MAX_SCALE } from '@/utils/craftStore'
+import { Grabbable } from './Grabbable'
 import npc1Url from '../models/npc1.glb'
 
-// id для craftStore.overrides - тот же общий механизм масштаба, что и у
-// построек карты (Grabbable.tsx), но БЕЗ самого Grabbable: у NPC уже
-// есть свой хитбокс/hover для диалога (см. ниже), и оборачивание в
-// Grabbable дало бы ВТОРОЙ, полностью совпадающий по размеру и позиции
-// хитбокс поверх первого - stopPropagation в Grabbable.onHitboxClick мог
-// бы перехватить клик раньше, чем он дойдёт до диалога (гонка по порядку
-// пересечений raycast'а). Проще и надёжнее переиспользовать сам стор
-// (setScale не привязан к Grabbable ничем, кроме сигнатуры) и нарисовать
-// свою маленькую +/- панель на уже существующем hover.
+// id для craftStore.overrides - тот же общий механизм масштаба/переноса,
+// что и у построек карты (MapProps.tsx, Grabbable.tsx).
 const NPC_ID = 'questNpc1'
-const SCALE_STEP = 0.1
-
-const resizePanelStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  padding: '0.45rem 0.7rem',
-  background: 'rgba(10, 17, 32, 0.88)',
-  border: '1px solid rgba(255, 215, 106, 0.55)',
-  borderRadius: '999px',
-  fontFamily: "'Orbitron', sans-serif",
-  whiteSpace: 'nowrap',
-  pointerEvents: 'auto',
-  cursor: 'default',
-}
-
-const resizeButtonStyle: CSSProperties = {
-  width: '1.6rem',
-  height: '1.6rem',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 0,
-  background: 'rgba(255, 215, 106, 0.15)',
-  border: '1px solid rgba(255, 215, 106, 0.6)',
-  borderRadius: '50%',
-  color: '#ffe9b0',
-  fontFamily: "'Orbitron', sans-serif",
-  fontSize: '0.9rem',
-  lineHeight: 1,
-  cursor: 'pointer',
-  touchAction: 'manipulation',
-}
-
-const resizePercentStyle: CSSProperties = {
-  color: '#ffe9b0',
-  fontSize: '0.68rem',
-  minWidth: '2.6rem',
-  textAlign: 'center',
-}
 
 // x=2 (не 0) намеренно: камера смотрит от игрока вдоль его локальной
 // оси вперёд (GameCamera.tsx), и NPC ровно на этой оси на споне
@@ -137,80 +88,39 @@ function QuestMarkerIcon({ symbol }: { symbol: '!' | '?' }) {
 }
 
 // NPC, у которого берут/сдают квест кликом — как в World of Warcraft.
+// Дополнение 6 (по отзыву клиента "нельзя увеличить странника"): раньше
+// у NPC была СВОЯ отдельная мини-панель масштаба (drei <Html>, БЕЗ
+// задержки скрытия — hovered сбрасывался мгновенно по onPointerOut,
+// из-за чего кнопки были физически некликабельны: панель пропадала
+// раньше, чем курсор до неё долетал). NPC также был единственным
+// объектом карты, у которого вообще не было переноса. Теперь NPC — тот
+// же самый Grabbable, что и все постройки MapProps.tsx (масштаб/перенос
+// через единую ObjectToolbar.tsx). Раньше NPC не оборачивался в
+// Grabbable намеренно, чтобы избежать ВТОРОГО хитбокса поверх
+// диалогового клика — решено иначе: Grabbable.onClickWhenIdle отдаёт
+// диалогу тот же самый хитбокс (обычный клик, пока ничего не в руках, —
+// открывает диалог; двойной клик — берёт NPC для переноса, как и у
+// любого другого объекта).
 // Ориентация модели (rotation) не проверена вживую (нет браузера в этом
 // окружении) — если он "стоит спиной" к точке, откуда обычно подходит
 // игрок, поправить одной цифрой.
 export function QuestNpc() {
-  const [hovered, setHovered] = useState(false)
   const { scene } = useGLTF(npc1Url)
   const setDialogueOpen = useQuestStore((s) => s.setDialogueOpen)
   const phase = useQuestStore((s) => s.phase)
-  const scaleMultiplier = useCraftStore((s) => s.overrides[NPC_ID]?.scale ?? 1)
-
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation()
-    setDialogueOpen(true)
-  }
 
   return (
-    <group position={NPC_POSITION}>
-      {/* Модель, хитбокс и маркер квеста масштабируются вместе (та же
-          логика, что в Grabbable.tsx) - хитбокс клика должен расти вместе
-          с моделью, иначе на увеличенном NPC клик мимо новой видимой
-          границы просто не сработает. */}
-      <group scale={scaleMultiplier}>
-        <primitive object={scene} />
-        <mesh
-          position={HITBOX_CENTER}
-          onClick={onClick}
-          onPointerOver={() => {
-            setHovered(true)
-            document.body.style.cursor = 'pointer'
-          }}
-          onPointerOut={() => {
-            setHovered(false)
-            document.body.style.cursor = 'auto'
-          }}
-        >
-          <boxGeometry args={HITBOX_SIZE} />
-          <meshBasicMaterial visible={false} />
-        </mesh>
-        {/* лёгкая подсветка при наведении — подсказка, что объект кликабелен */}
-        {hovered && (
-          <mesh position={[0, 1.9, 0]}>
-            <coneGeometry args={[0.12, 0.22, 4]} />
-            <meshBasicMaterial color="#ffd76a" toneMapped={false} />
-          </mesh>
-        )}
-        {phase === 'not_started' && <QuestMarkerIcon symbol="!" />}
-        {phase === 'ready_to_turn_in' && <QuestMarkerIcon symbol="?" />}
-        {/* По просьбе клиента - размер NPC можно увеличить/уменьшить,
-            та же панель +/-, что и у обычных построек (Grabbable.tsx). */}
-        {hovered && (
-          <Html position={[0, HITBOX_CENTER[1] + HITBOX_SIZE[1] / 2 + 0.6, HITBOX_CENTER[2]]} center distanceFactor={8}>
-            <div style={resizePanelStyle}>
-              <button
-                style={resizeButtonStyle}
-                onClick={() => useCraftStore.getState().setScale(NPC_ID, NPC_POSITION, scaleMultiplier - SCALE_STEP)}
-                disabled={scaleMultiplier <= MIN_SCALE}
-                aria-label="Уменьшить"
-              >
-                −
-              </button>
-              <span style={resizePercentStyle}>{Math.round(scaleMultiplier * 100)}%</span>
-              <button
-                style={resizeButtonStyle}
-                onClick={() => useCraftStore.getState().setScale(NPC_ID, NPC_POSITION, scaleMultiplier + SCALE_STEP)}
-                disabled={scaleMultiplier >= MAX_SCALE}
-                aria-label="Увеличить"
-              >
-                +
-              </button>
-            </div>
-          </Html>
-        )}
-      </group>
-    </group>
+    <Grabbable
+      id={NPC_ID}
+      defaultPosition={NPC_POSITION}
+      hitboxSize={HITBOX_SIZE}
+      hitboxCenter={HITBOX_CENTER}
+      onClickWhenIdle={() => setDialogueOpen(true)}
+    >
+      <primitive object={scene} />
+      {phase === 'not_started' && <QuestMarkerIcon symbol="!" />}
+      {phase === 'ready_to_turn_in' && <QuestMarkerIcon symbol="?" />}
+    </Grabbable>
   )
 }
 

@@ -119,6 +119,16 @@ interface CraftState {
   // откатывать масштаб для объекта, у которого ещё нет override.
   hoveredId: string | null
   defaultPositions: Record<string, [number, number, number]>
+  // Есть 3 объекта карты (Ракета/оба игровых автомата в MapProps.tsx),
+  // чьи мировые координаты продублированы в других системах (квесты,
+  // миникарта) без механизма синхронизации - переносить их по карте
+  // нельзя, не сломав квесты, а вот МАСШТАБИРОВАТЬ можно совершенно
+  // безопасно (масштаб на эти внешние системы никак не влияет). movableIds
+  // - реестр (наполняется Grabbable при монтировании, как и
+  // defaultPositions), default true для любого не зарегистрированного id -
+  // ObjectToolbar.tsx читает его, чтобы скрыть кнопку "Переместить" именно
+  // для этих объектов, оставив шкалу масштаба доступной.
+  movableIds: Record<string, boolean>
   startMoving: (id: string, y: number) => void
   place: (id: string, position: [number, number, number]) => void
   cancelMoving: () => void
@@ -126,6 +136,7 @@ interface CraftState {
   setMoveModeEnabled: (enabled: boolean) => void
   setHoveredId: (id: string | null) => void
   registerDefaultPosition: (id: string, position: [number, number, number]) => void
+  registerMovable: (id: string, movable: boolean) => void
 }
 
 export const useCraftStore = create<CraftState>((set) => ({
@@ -135,6 +146,7 @@ export const useCraftStore = create<CraftState>((set) => ({
   moveModeEnabled: loadMoveModeEnabled(),
   hoveredId: null,
   defaultPositions: {},
+  movableIds: {},
   // Не подхватывает второй объект, пока первый ещё не поставлен -
   // одновременно двигать можно только что-то одно.
   startMoving: (id, y) => set((s) => (s.movingId ? {} : { movingId: id, movingOriginalY: y })),
@@ -165,6 +177,7 @@ export const useCraftStore = create<CraftState>((set) => ({
   setHoveredId: (id) => set({ hoveredId: id }),
   registerDefaultPosition: (id, position) =>
     set((s) => ({ defaultPositions: { ...s.defaultPositions, [id]: position } })),
+  registerMovable: (id, movable) => set((s) => ({ movableIds: { ...s.movableIds, [id]: movable } })),
 }))
 
 // Живая точка на земле, куда сейчас смотрит курсор - отдельный vanilla-

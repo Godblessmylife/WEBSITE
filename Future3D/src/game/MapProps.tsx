@@ -1,5 +1,5 @@
 import { useGLTF } from '@react-three/drei'
-import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { CuboidCollider } from '@react-three/rapier'
 import { Grabbable } from './Grabbable'
 import minishopUrl from '../models/minishop.glb'
 import shopUrl from '../models/shop.glb'
@@ -35,10 +35,13 @@ import ostrovUrl from '../models/ostrov.glb'
 // GameMode.tsx, см. Grabbable.tsx/craftStore.ts) - клик по объекту в
 // этом режиме "берёт" его, следующий клик ставит на новое место (X/Z по
 // курсору, высота не трогается). Rocket/SlotMachine/SlotMachine2 НЕ
-// сделаны берущимися намеренно - их мировые координаты продублированы в
-// QuestObjectiveRocket.tsx/QuestObjectiveChip.tsx/Minimap.tsx, и перенос
-// в рантайме рассинхронизировал бы квесты с картой без отдельного
-// механизма синхронизации, которого пока нет.
+// подлежат ПЕРЕНОСУ (movable={false}) - их мировые координаты
+// продублированы в QuestObjectiveRocket.tsx/QuestObjectiveChip.tsx/
+// Minimap.tsx, и перенос в рантайме рассинхронизировал бы квесты с
+// картой без отдельного механизма синхронизации, которого пока нет. По
+// отзыву клиента ("нельзя увеличить многие модели") они всё же обёрнуты
+// в Grabbable ради МАСШТАБА - на позиции этих трёх систем масштаб никак
+// не влияет, это чисто визуальный размер.
 
 function Minishop() {
   const { scene } = useGLTF(minishopUrl)
@@ -75,14 +78,22 @@ function Shop() {
   )
 }
 
+const ROCKET_POSITION: [number, number, number] = [-22, 1.138, -28]
+
 function Rocket() {
   const { scene } = useGLTF(rocketUrl)
   // bbox: (-4.49,-1.14,-3.89) .. (4.08,7.83,2.17), scale=1
   return (
-    <RigidBody type="fixed" colliders={false} position={[-22, 1.138, -28]}>
+    <Grabbable
+      id="rocket"
+      defaultPosition={ROCKET_POSITION}
+      hitboxSize={[8.57, 8.97, 6.06]}
+      hitboxCenter={[-0.21, 3.34, -0.86]}
+      movable={false}
+    >
       <CuboidCollider args={[4.29, 4.48, 3.03]} position={[-0.21, 3.34, -0.86]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -163,6 +174,9 @@ function Npc2Decor() {
   )
 }
 
+const SLOT_MACHINE_POSITION: [number, number, number] = [60, 0, -50]
+const SLOT_MACHINE_2_POSITION: [number, number, number] = [60, 0.335, -30]
+
 function SlotMachine() {
   const { scene } = useGLTF(slotUrl)
   // bbox: (-5.865,0,-4.681) .. (5.865,23.973,4.681), scale=1 — уже стоит
@@ -170,10 +184,16 @@ function SlotMachine() {
   // автомата, но доверяем авторскому масштабу модели без визуальной
   // проверки в браузере.
   return (
-    <RigidBody type="fixed" colliders={false} position={[60, 0, -50]}>
+    <Grabbable
+      id="slotMachine"
+      defaultPosition={SLOT_MACHINE_POSITION}
+      hitboxSize={[11.73, 23.98, 9.36]}
+      hitboxCenter={[0, 11.99, 0]}
+      movable={false}
+    >
       <CuboidCollider args={[5.865, 11.99, 4.68]} position={[0, 11.99, 0]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
@@ -182,10 +202,16 @@ function SlotMachine2() {
   // Скиненная модель — bbox по исходнику (см. комментарий в Npc2Decor):
   // (-0.341,-0.335,-1.851) .. (0.359,0.434,-0.002).
   return (
-    <RigidBody type="fixed" colliders={false} position={[60, 0.335, -30]}>
+    <Grabbable
+      id="slotMachine2"
+      defaultPosition={SLOT_MACHINE_2_POSITION}
+      hitboxSize={[0.7, 0.77, 1.85]}
+      hitboxCenter={[0.01, 0.05, -0.93]}
+      movable={false}
+    >
       <CuboidCollider args={[0.35, 0.38, 0.92]} position={[0.01, 0.05, -0.93]} />
       <primitive object={scene} />
-    </RigidBody>
+    </Grabbable>
   )
 }
 
