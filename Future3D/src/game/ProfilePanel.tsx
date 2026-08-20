@@ -112,9 +112,38 @@ export function ProfilePanel() {
   // PAYMENT_URL выше).
   const [tab, setTab] = useState<'roster' | 'more'>('roster')
 
+  // БАГ (обнаружен при добавлении тяжёлого превью "Скелетона"): этот
+  // маленький Canvas - ТРЕТИЙ одновременный WebGL-контекст на странице
+  // (помимо основного игрового и, если ещё виден, JourneyScene) - под
+  // нагрузкой от декодирования крупных текстур GPU реально теряет
+  // контекст (подтверждено: `THREE.WebGLRenderer: Context Lost.` в
+  // консоли). Браузер способен молча "восстановить" WebGL-контекст
+  // (isContextLost() снова false), но все текстуры/буферы Three.js всё
+  // равно потеряны безвозвратно - без пересоздания Canvas превью
+  // застревает полностью белым НАВСЕГДА. Тот же приём восстановления,
+  // что уже есть в GameMode.tsx/JourneyScene.tsx - полный ремонт через
+  // смену key вместо пассивного ожидания.
+  const [previewRecoveryKey, setPreviewRecoveryKey] = useState(0)
+  const previewRecoveryAttemptsRef = useRef(0)
+  const MAX_PREVIEW_CONTEXT_RECOVERY_ATTEMPTS = 3
+  const handlePreviewCanvasCreated = ({ gl }: { gl: THREE.WebGLRenderer }) => {
+    gl.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault()
+      previewRecoveryAttemptsRef.current += 1
+      console.error('[ProfilePanel] WebGL context lost, попытка восстановления', previewRecoveryAttemptsRef.current)
+      if (previewRecoveryAttemptsRef.current > MAX_PREVIEW_CONTEXT_RECOVERY_ATTEMPTS) return
+      window.setTimeout(() => setPreviewRecoveryKey((k) => k + 1), 300)
+    })
+  }
+
   if (!isOpen) return null
 
   const model = resolveHeroModel(selectedHeroId)
+  // Герой, ещё не разблокированный (см. locked в heroModels.ts) - если
+  // есть, вкладка "Ещё герои" показывает его настоящее вращаемое превью
+  // вместо декоративного "?"; если такого героя пока нет (например, все
+  // уже разблокированы) - остаётся placeholder ниже.
+  const lockedHero = HERO_MODELS.find((m) => m.locked)
   // Камера смотрит на середину роста (TARGET_VIEW_HEIGHT/2), дистанция
   // подобрана так, чтобы при fov=45 в кадр с запасом входила модель
   // высотой до TARGET_VIEW_HEIGHT целиком, включая стопы и макушку.
@@ -229,7 +258,11 @@ export function ProfilePanel() {
             {/* key на id модели - полный ремонт Canvas-содержимого при смене
                 персонажа проще и надёжнее, чем вручную сбрасывать состояние
                 useGLTF/useAnimations на смену url. */}
-            <Canvas key={model.id} camera={{ position: [0, targetY + 0.15, cameraDistance], fov: 45 }}>
+            <Canvas
+              key={`${model.id}-${previewRecoveryKey}`}
+              camera={{ position: [0, targetY + 0.15, cameraDistance], fov: 45 }}
+              onCreated={handlePreviewCanvasCreated}
+            >
               <ambientLight intensity={0.7} />
               <directionalLight position={[3, 5, 4]} intensity={1.3} />
               <pointLight position={[0, 2, 1]} color="#5fd4ff" intensity={1.5} distance={6} />
@@ -255,7 +288,7 @@ export function ProfilePanel() {
               maxWidth: 'min(90vw, 480px)',
             }}
           >
-            {HERO_MODELS.map((m) => {
+            {HERO_MODELS.filter((m) => !m.locked).map((m) => {
               const active = m.id === selectedHeroId
               return (
                 <button
@@ -316,42 +349,83 @@ export function ProfilePanel() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '1rem',
-              padding: '1.5rem',
+              padding: lockedHero ? 0 : '1.5rem',
               textAlign: 'center',
             }}
           >
-            <div
-              style={{
-                fontFamily: "'Orbitron', sans-serif",
-                fontSize: '5rem',
-                fontWeight: 700,
-                color: '#d7c3ff',
-                textShadow: '0 0 24px rgba(147, 92, 255, 0.85), 0 0 48px rgba(147, 92, 255, 0.5)',
-              }}
-            >
-              ?
-            </div>
-            <div style={{ color: '#c8b8ff', fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', maxWidth: '22rem' }}>
-              Новый герой уже готовится. Разблокируйте доступ, чтобы узнать, кто это.
-            </div>
-            <button
-              onClick={openPayment}
-              style={{
-                padding: '0.65rem 1.4rem',
-                minHeight: '2.75rem',
-                background: 'rgba(147, 92, 255, 0.85)',
-                border: '1px solid #d7c3ff',
-                borderRadius: '999px',
-                color: '#0c0518',
-                fontFamily: "'Orbitron', sans-serif",
-                fontWeight: 700,
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              Разблокировать - $9.99
-            </button>
+            {lockedHero ? (
+              // Настоящее превью запертого героя (Дополнение 6) - вращается
+              // так же, как и в обычной вкладке "Герои", но выбрать его
+              // здесь нельзя (нет кнопки "Выбрать" под превью) - только
+              // посмотреть и, по клику ниже, открыть оплату.
+              <Canvas
+                key={`${lockedHero.id}-${previewRecoveryKey}`}
+                camera={{ position: [0, targetY + 0.15, cameraDistance], fov: 45 }}
+                onCreated={handlePreviewCanvasCreated}
+              >
+                <ambientLight intensity={0.7} />
+                <directionalLight position={[3, 5, 4]} intensity={1.3} />
+                <pointLight position={[0, 2, 1]} color="#935cff" intensity={1.5} distance={6} />
+                <PreviewModel url={lockedHero.url} />
+                <OrbitControls
+                  target={[0, targetY, 0]}
+                  enablePan={false}
+                  minDistance={cameraDistance * 0.6}
+                  maxDistance={cameraDistance * 1.8}
+                  minPolarAngle={Math.PI / 5}
+                  maxPolarAngle={Math.PI / 1.7}
+                />
+              </Canvas>
+            ) : (
+              <div
+                style={{
+                  fontFamily: "'Orbitron', sans-serif",
+                  fontSize: '5rem',
+                  fontWeight: 700,
+                  color: '#d7c3ff',
+                  textShadow: '0 0 24px rgba(147, 92, 255, 0.85), 0 0 48px rgba(147, 92, 255, 0.5)',
+                }}
+              >
+                ?
+              </div>
+            )}
           </div>
+
+          {lockedHero && (
+            <div style={{ color: '#d7c3ff', fontFamily: "'Orbitron', sans-serif", fontSize: '0.9rem', marginTop: '0.85rem' }}>
+              {lockedHero.label}
+            </div>
+          )}
+          <div
+            style={{
+              color: '#c8b8ff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.85rem',
+              maxWidth: '22rem',
+              marginTop: '0.5rem',
+              textAlign: 'center',
+            }}
+          >
+            Новый герой уже готовится. Разблокируйте доступ, чтобы узнать, кто это.
+          </div>
+          <button
+            onClick={openPayment}
+            style={{
+              marginTop: '1rem',
+              padding: '0.65rem 1.4rem',
+              minHeight: '2.75rem',
+              background: 'rgba(147, 92, 255, 0.85)',
+              border: '1px solid #d7c3ff',
+              borderRadius: '999px',
+              color: '#0c0518',
+              fontFamily: "'Orbitron', sans-serif",
+              fontWeight: 700,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            Разблокировать - $9.99
+          </button>
         </>
       )}
     </div>

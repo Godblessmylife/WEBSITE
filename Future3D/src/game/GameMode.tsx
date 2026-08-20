@@ -162,7 +162,25 @@ export function GameMode() {
     const t = window.setTimeout(() => setMinDelayPassed(true), MIN_LOADING_SCREEN_MS)
     return () => window.clearTimeout(t)
   }, [])
-  const isLoaded = assetsLoaded && minDelayPassed
+  const assetsReady = assetsLoaded && minDelayPassed
+  // БАГ (обнаружен при добавлении второго героя в heroModels.ts):
+  // useProgress следит за ОБЩИМ на всё приложение THREE.DefaultLoadingManager,
+  // а не только за моделями стартовой загрузки - ЛЮБАЯ последующая ленивая
+  // подгрузка (превью героя в ProfilePanel.tsx, "Сменить внешность" в
+  // QuestUI.tsx) на секунду сбрасывает assetsReady обратно в false, из-за
+  // чего ВЕСЬ HUD (счёт, миникарта, кнопки, само окно "Профиль") исчезал и
+  // заменялся полноэкранным экраном загрузки прямо у игрока на глазах,
+  // пока догружалась одна маленькая модель для превью. Раньше это было
+  // незаметно - герой был всего один, уже предзагруженный PlayerCharacter.tsx
+  // при входе в игру, так что HERO_MODELS.forEach(preload)/выбор в
+  // ProfilePanel никогда не грузили ничего НОВОГО. "Липкий" latch (тот же
+  // приём, что GlobalBackdrop.tsx: everShown) - once true, навсегда true:
+  // HUD показывается один раз при старте игры и больше НЕ прячется из-за
+  // последующей фоновой подгрузки чего угодно ещё.
+  const [isLoaded, setIsLoaded] = useState(false)
+  useEffect(() => {
+    if (assetsReady) setIsLoaded(true)
+  }, [assetsReady])
 
   // Полное пересоздание Canvas (см. key ниже) - основной способ пережить
   // потерю WebGL-контекста. По отзыву клиента "иногда выкидывает после

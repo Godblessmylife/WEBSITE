@@ -170,6 +170,13 @@ export function Minimap() {
 
   useEffect(() => {
     const unsub = minimapPlayerStore.subscribe((state) => {
+      // MinimapTracker (внутри Canvas, useFrame) пишет в этот стор КАЖДЫЙ
+      // кадр независимо от того, смонтирован ли сейчас именно этот DOM-
+      // компонент - на стыке unmount/remount (см. isLoaded в GameMode.tsx)
+      // ref успевает стать null раньше, чем сработает cleanup этого
+      // useEffect (React 18: коммит DOM/ref идёт раньше пассивных эффектов
+      // очистки) - без проверки это кидало TypeError на каждый такой кадр.
+      if (!arrowRef.current) return
       const { left, top } = worldToMap(state.x, state.z)
       const deg = THREE.MathUtils.radToDeg(state.yaw)
       arrowRef.current.style.transform = `translate(${left}px, ${top}px) rotate(${deg}deg)`
