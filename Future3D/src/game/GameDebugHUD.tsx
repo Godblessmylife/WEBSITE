@@ -34,7 +34,14 @@ export function GameDebugHUD() {
     <div
       style={{
         position: 'absolute',
-        top: `calc(${isMobile ? '0.75rem' : '1.5rem'} + ${isMobile ? '2.1rem' : '2.75rem'} + 0.5rem + env(safe-area-inset-top))`,
+        // По просьбе клиента мини-карта (Minimap.tsx) на мобильном
+        // переехала ровно в эту точку (под кнопку "Выход") - FPS сдвинут
+        // ещё ниже, под саму карту (168px * scale(0.25) = 42px + отступ),
+        // чтобы не перекрываться с ней. На десктопе карта осталась внизу
+        // справа, как раньше - формула здесь не меняется.
+        top: isMobile
+          ? `calc(0.75rem + 2.1rem + 0.5rem + 42px + 0.4rem + env(safe-area-inset-top))`
+          : `calc(1.5rem + 2.75rem + 0.5rem + env(safe-area-inset-top))`,
         right: `calc(${isMobile ? '0.75rem' : '1.5rem'} + env(safe-area-inset-right))`,
         padding: isMobile ? '0.15rem 0.4rem' : '0.3rem 0.7rem',
         background: 'rgba(5, 7, 13, 0.6)',

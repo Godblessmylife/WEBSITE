@@ -19,6 +19,15 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
+    <!-- Установка на рабочий стол (PWA) - iOS Safari не читает манифест
+         для part управления видом standalone-режима, нужны отдельные
+         apple-* мета-теги. Android/Chrome берут это из site.webmanifest
+         (display: standalone) - им эти теги не нужны, но не мешают. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Future3D" />
+
     <!-- Open Graph - превью при отправке ссылки в Telegram/соцсетях
          (картинка + заголовок + описание вместо голой ссылки). -->
     <meta property="og:type" content="website" />

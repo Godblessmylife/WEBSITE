@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { useGraphicsQualityStore, MIN_FOV, MAX_FOV, MIN_DRAW_DISTANCE_MULTIPLIER, MAX_DRAW_DISTANCE_MULTIPLIER } from '@/utils/graphicsQualityStore'
 import type { GraphicsQuality } from '@/utils/graphicsQualityStore'
 import { useCraftStore } from '@/utils/craftStore'
+import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
+import { ControlsInfoModal } from './ControlsInfoModal'
+import { InstallAppButton } from './InstallAppButton'
 
 const QUALITY_LABELS: Record<GraphicsQuality, string> = {
   high: 'Высокое',
@@ -51,6 +55,8 @@ function GearIcon() {
 //   способа управления касанием одновременно работать не могут.
 export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
   const [open, setOpen] = useState(false)
+  const [controlsOpen, setControlsOpen] = useState(false)
+  const isMobile = useIsMobileViewport()
   const quality = useGraphicsQualityStore((s) => s.quality)
   const setQuality = useGraphicsQualityStore((s) => s.setQuality)
   const fov = useGraphicsQualityStore((s) => s.fov)
@@ -98,6 +104,15 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
             border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: '12px',
             minWidth: '170px',
+            // БАГ (по отзыву клиента): панель раскрывается ВНИЗ от кнопки,
+            // которая сама стоит у самого верха экрана - на мобильном с
+            // коротким viewport и уже выросшим списком настроек (качество
+            // + FOV + дальность + тени + перемещение объектов + новые
+            // секции ниже) панель упиралась в нижний край и обрезалась.
+            // maxHeight + собственный скролл - показывает всё содержимое,
+            // просто с прокруткой внутри панели, а не наружу за экран.
+            maxHeight: isMobile ? '70vh' : '80vh',
+            overflowY: 'auto',
           }}
         >
           <span
@@ -243,8 +258,44 @@ export function GraphicsSettingsButton({ style }: { style?: CSSProperties }) {
               {moveModeEnabled ? 'Включено (без джойстика)' : 'Выключено'}
             </span>
           </label>
+
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '0.3rem 0' }} />
+
+          {/* По просьбе клиента - справка по управлению (PC/мобильные) и
+              установка игры на рабочий стол, обе прямо в настройках. */}
+          <button
+            onClick={() => {
+              setControlsOpen(true)
+              setOpen(false)
+            }}
+            style={{
+              padding: '0.4rem 0.6rem',
+              borderRadius: '8px',
+              border: '1px solid transparent',
+              background: 'transparent',
+              color: '#eafcff',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.72rem',
+              textAlign: 'left',
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            ℹ️ Управление
+          </button>
+
+          <InstallAppButton />
         </div>
       )}
+      {/* БАГ: эта кнопка живёт внутри обёртки с transform: translateX(-50%)
+          (GameMode.tsx центрирует шестерёнку сверху экрана) -
+          трансформированный предок создаёт свой "containing block" для
+          ЛЮБОГО position:fixed потомка (стандартное поведение CSS), из-за
+          чего ControlsInfoModal позиционировался бы не относительно
+          экрана, а относительно этой узкой кнопки - модалка сжималась в
+          вертикальную полоску вместо полноэкранного окна. Портал в
+          document.body - вне трансформированного дерева - решает это. */}
+      {controlsOpen && createPortal(<ControlsInfoModal onClose={() => setControlsOpen(false)} />, document.body)}
     </div>
   )
 }
