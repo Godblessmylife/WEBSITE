@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import '@fontsource/orbitron/700.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/600.css'
@@ -35,6 +35,23 @@ export function App() {
   const isGameActive = useGameStore((s) => s.isGameActive)
   const setGameActive = useGameStore((s) => s.setGameActive)
   const isGalleryOpen = useGalleryStore((s) => s.isOpen)
+
+  // По просьбе клиента - установленная на рабочий стол иконка (PWA) ведёт
+  // сразу в игру, а не на верх лендинга (site.webmanifest: start_url
+  // "/?play=game"). isGameActive - обычный boolean-флаг (см. GameMode
+  // ниже) - переключить его напрямую безопасно независимо от текущей
+  // позиции скролла, GameMode - полноэкранный оверлей, а не часть
+  // страницы, привязанная к 3D-путешествию. history.replaceState убирает
+  // параметр из адресной строки после срабатывания - чисто косметика,
+  // не влияет на сам запуск (в standalone-режиме адресной строки и так не
+  // видно, но обычный браузер её показывает).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('play') === 'game') {
+      setGameActive(true)
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>

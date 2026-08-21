@@ -2,7 +2,7 @@
   "name": "Future3D — JavaScript разработчик",
   "short_name": "Future3D",
   "description": "Сайты, 3D-сцены и игры под ключ.",
-  "start_url": "/",
+  "start_url": "/?play=game",
   "display": "standalone",
   "background_color": "#05070d",
   "theme_color": "#05070d",
