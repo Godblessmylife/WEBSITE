@@ -75,11 +75,21 @@ const navStyle: CSSProperties = {
 
 // По просьбе клиента кнопки сделаны прозрачнее (ниже alpha у фона) и
 // чуть компактнее (меньше padding/minHeight/шрифт), чем раньше.
+//
+// Шрифт - Russo One (по просьбе клиента "уникальный шрифт в космическом
+// стиле" для этих 4 кнопок отдельно от остального сайта, где везде
+// Orbitron - см. GameMode.tsx/HUD игры и т.п.). Уже подключён в проекте
+// (App.tsx: '@fontsource/russo-one/cyrillic-400.css', используется для
+// крупного 3D-заголовка "РАЗРАБОТКА ВЕБ-САЙТОВ" в ParticleHeading.tsx) -
+// новых шрифтовых файлов на сайт не добавляет. Только вес 400 реально
+// загружен - fontWeight:700 без 700-го файла браузер бы "дорисовывал"
+// сам (faux bold, выглядит грубее) - у Russo One и так один плотный,
+// визуально уже "жирный" по рисунку вес, 400 достаточно.
 const navButtonBase: CSSProperties = {
   pointerEvents: 'auto',
   position: 'relative',
-  fontFamily: "'Orbitron', sans-serif",
-  fontWeight: 700,
+  fontFamily: "'Russo One', 'Orbitron', sans-serif",
+  fontWeight: 400,
   fontSize: '0.72rem',
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
