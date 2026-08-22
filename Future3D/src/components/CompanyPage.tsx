@@ -28,6 +28,7 @@ const PHOTOS = [
   { src: '/about/photo-1.jpg', caption: 'Decentralized: No Matter What v.2 — крипто-конференция' },
   { src: '/about/photo-2.jpg', caption: 'Нетворкинг с командами Web3-индустрии' },
   { src: '/about/photo-3.jpg', caption: 'На индустриальных мероприятиях блокчейн-экосистемы' },
+  { src: '/about/photo-4-hackathon.jpg', caption: 'Solana Breakout Hackathon (Colosseum × Solana Foundation)' },
 ]
 
 const RESUME_URL = '/resume.pdf'
