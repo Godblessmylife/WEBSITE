@@ -11,13 +11,18 @@ import { useScrollStore } from '@/utils/scrollStore'
 // "/?page=about" (App.tsx читает query-параметр при загрузке, тот же
 // приём, что уже есть для "?play=game").
 
+// Реальные факты из резюме (CV SENIOR -IOANNES-.pdf, см. public/resume.pdf)
+// + то, что клиент назвал в переписке напрямую (Trust Wallet, Cardano) -
+// раньше здесь были более общие формулировки, местами дублировавшие
+// заголовок hero-блока ("16 лет в коде" повторялось дважды) - теперь
+// каждая карточка про конкретный, отдельный факт.
 const ACHIEVEMENTS = [
-  { icon: '🏆', title: '3× ЧЕМПИОН ХАКАТОНОВ', text: 'Трёхкратный победитель хакатонов — от идеи до рабочего прототипа за одну ночь.' },
-  { icon: '👛', title: 'TRUST WALLET', text: 'Разработка для Trust Wallet — участие в создании и доработке продуктов экосистемы.' },
-  { icon: '⛓', title: 'CARDANO ECOSYSTEM', text: 'Помогал строить экосистему Cardano — интеграции, инструменты, инфраструктура.' },
-  { icon: '🔐', title: 'SECURITY RESEARCH', text: 'Нахожу эксплойты и уязвимости в смарт-контрактах и веб-приложениях до того, как это сделают другие.' },
-  { icon: '⏱', title: '16 ЛЕТ В КОДЕ', text: 'JavaScript и TypeScript — с самого их взросления до текущих продвинутых стеков.' },
-  { icon: '✍️', title: 'КОД БЕЗ ПОСРЕДНИКОВ', text: 'Пишу и проверяю каждую строчку кода лично — ни аутсорса, ни конвейера.' },
+  { icon: '🏆', title: 'ПОБЕДЫ В ХАКАТОНАХ', text: 'Трёхкратный чемпион хакатонов, включая победу на DoraHacks (экосистема Solana) и участие в Solana Breakout Hackathon (Colosseum).' },
+  { icon: '🚀', title: 'ENLIGHTENED MINDS', text: 'Партнёр и лид-разработчик: блокчейн- и AI-платформы на 100K+ пользователей, задержка снижена до 30%.' },
+  { icon: '👛', title: 'TRUST WALLET & CARDANO', text: 'Разработка для Trust Wallet и участие в построении экосистемы Cardano.' },
+  { icon: '⛓', title: 'SMART CONTRACTS', text: 'Solidity и Rust на EVM и Solana — токен-логика, стейкинг, безопасная проверка подписей кошельков.' },
+  { icon: '🔐', title: 'SECURITY-FIRST', text: 'Threat modeling и security-by-design в бэкенде и Web3-инфраструктуре, поиск эксплойтов до того, как это сделают другие.' },
+  { icon: '🖥', title: '1200+ ВИДЕОКАРТ', text: 'Строил и оптимизировал GPU-инфраструктуру на 1200+ карт, вплоть до BGA-пайки для апгрейда памяти.' },
 ]
 
 // Фото с профильных мероприятий - файлы лежат в public/about/, поэтому
@@ -156,6 +161,14 @@ export function CompanyPage() {
 
   return (
     <div
+      // data-lenis-prevent - БАГ, на который указал клиент ("страница не
+      // прокручивается"): useLenis() (App.tsx) вешает Lenis на весь
+      // документ, и по умолчанию Lenis сам перехватывает wheel/touch
+      // события везде и виртуально скроллит window - вложенный div с
+      // overflowY:auto эти события уже не получает. data-lenis-prevent -
+      // штатный атрибут Lenis, отключающий перехват для этого узла и его
+      // потомков, тогда скролл внутри оверлея работает нативно.
+      data-lenis-prevent
       style={{
         position: 'fixed',
         inset: 0,
@@ -172,20 +185,40 @@ export function CompanyPage() {
       <div style={{ maxWidth: '980px', margin: '0 auto', padding: '5.5rem 1.5rem 5rem' }}>
         {/* Hero */}
         <p style={{ ...sectionLabelStyle, textAlign: 'center' }}>О КОМПАНИИ</p>
+        {/* Имя - Ioannes Avakian (см. реальное резюме, public/resume.pdf) -
+            раньше страница была полностью анонимной, по просьбе клиента
+            добавлено. */}
+        <p
+          style={{
+            textAlign: 'center',
+            fontFamily: "'Orbitron', sans-serif",
+            color: '#eafcff',
+            fontSize: 'clamp(0.85rem, 2vw, 1rem)',
+            letterSpacing: '0.1em',
+            margin: '0 0 0.5rem',
+          }}
+        >
+          IOANNES AVAKIAN
+        </p>
+        {/* Заголовок построен вокруг реального факта из резюме (мотоспорт
+            -> Web3), а не обобщённого "N лет опыта" - раньше "16 ЛЕТ В
+            КОДЕ" стояло здесь ЖЕ, что и в карточке достижений ниже -
+            дословный повтор, на который указал клиент. "16 лет опыта"
+            теперь встречается только один раз - в абзаце ниже. */}
         <h1
           style={{
             fontFamily: "'Orbitron', sans-serif",
-            fontSize: 'clamp(2rem, 6vw, 3.4rem)',
-            lineHeight: 1.1,
+            fontSize: 'clamp(1.7rem, 5.5vw, 3rem)',
+            lineHeight: 1.15,
             textAlign: 'center',
             margin: '0 0 1rem',
             color: '#f4f9ff',
             textShadow: '0 0 30px rgba(95, 212, 255, 0.35)',
           }}
         >
-          16 ЛЕТ В КОДЕ.
+          ОТ ГОНОЧНОЙ ТРАССЫ FERRARI
           <br />
-          НОЛЬ КОМПРОМИССОВ.
+          ДО WEB3 И БЛОКЧЕЙНА
         </h1>
         <p
           style={{
@@ -197,10 +230,11 @@ export function CompanyPage() {
             lineHeight: 1.7,
           }}
         >
-          16 лет опыта в JavaScript и TypeScript, трёхкратный чемпион хакатонов, разработка для
-          Trust Wallet и участие в построении экосистемы Cardano. Нахожу эксплойты там, где другие
-          их не видят. Пишу и проверяю код лично — использую передовые технологии и делаю то, что
-          другие считают невозможным.
+          Senior Software Engineer (Full-Stack / Web3) с 16-летним опытом в JavaScript и
+          TypeScript — от механика Formula-1 и сборки GPU-ферм до разработки для Trust Wallet и
+          построения экосистемы Cardano. Нахожу эксплойты там, где другие их не видят. Пишу и
+          проверяю код лично — использую передовые технологии и делаю то, что другие считают
+          невозможным.
         </p>
 
         {/* Достижения */}

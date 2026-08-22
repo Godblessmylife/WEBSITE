@@ -46,11 +46,16 @@ export function PaymentDetailsPage() {
 
   return (
     <div
+      // data-lenis-prevent - тот же фикс, что в CompanyPage.tsx: без него
+      // глобальный Lenis (useLenis(), App.tsx) перехватывает wheel/touch
+      // раньше, чем они доходят до overflowY:auto этого div.
+      data-lenis-prevent
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 900,
         overflowY: 'auto',
+        overscrollBehavior: 'contain',
         background: '#05070d',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.3s ease',
