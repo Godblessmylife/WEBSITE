@@ -114,7 +114,18 @@ export function QuestDialogue() {
             // слабых телефонах) - догружаем их именно в момент, когда
             // игрок реально открыл список выбора, чтобы клик по конкретной
             // модели ощущался почти так же мгновенно, как раньше.
-            HERO_MODELS.forEach((model) => useGLTF.preload(model.url))
+            // БАГ (по отзыву клиента "после выбора нового героя двойная
+            // перезагрузка") - этот список раньше показывал/предзагружал
+            // ВООБЩЕ ВСЕ HERO_MODELS, включая ещё не разблокированных
+            // (locked: true, см. heroModels.ts) - в обход платной вкладки
+            // "Ещё герои" в Профиле, которая как раз ТАКИЕ модели скрывает.
+            // Выбор "Скелетона" (4.67 МБ, никогда раньше не грузился)
+            // прямо во время игры реально перегружал GPU-память и ронял
+            // WebGL-контекст основного канваса (см. GameMode.tsx recovery) -
+            // иногда дважды подряд, что и ощущалось как "двойная
+            // перезагрузка". Теперь список (и предзагрузка) те же, что и
+            // в ProfilePanel.tsx - только разблокированные герои.
+            HERO_MODELS.filter((model) => !model.locked).forEach((model) => useGLTF.preload(model.url))
           }}
         >
           Сменить внешность
@@ -138,7 +149,7 @@ export function QuestDialogue() {
             gap: '0.5rem',
           }}
         >
-          {HERO_MODELS.map((model) => {
+          {HERO_MODELS.filter((model) => !model.locked).map((model) => {
             const active = model.id === selectedHeroId
             return (
               <button
