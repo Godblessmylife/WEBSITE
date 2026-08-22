@@ -3,6 +3,7 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 import { MapProps } from './MapProps'
 import { WORLD_HALF_EXTENT, WORLD_SIZE } from './worldConstants'
+import { DayNightSky } from './DayNightSky'
 
 // Остров (внешняя модель, экспортированная в масштабе ~18000 условных
 // единиц) визуально "не совпал по высоте" с полом — герой падал сквозь
@@ -77,18 +78,6 @@ function DesertGround() {
   )
 }
 
-function DesertSun() {
-  return (
-    <group position={[35, 45, -45]}>
-      <mesh>
-        <sphereGeometry args={[6, 24, 24]} />
-        <meshBasicMaterial color="#ffdca0" toneMapped={false} />
-      </mesh>
-      <directionalLight intensity={2.4} color="#ffe9c2" castShadow />
-    </group>
-  )
-}
-
 function Frond({ angle }: { angle: number }) {
   return (
     <group rotation={[0, angle, 0]}>
@@ -128,8 +117,10 @@ const PALM_POSITIONS: [number, number, number][] = [
 export function GameWorld() {
   return (
     <>
-      <ambientLight intensity={0.7} color="#ffe9c2" />
-      <DesertSun />
+      {/* День/ночь (по просьбе клиента) - вынесено в отдельный компонент
+          (DayNightSky.tsx), сам двигает солнце по дуге и плавно меняет
+          цвет/яркость света каждый кадр - см. подробности там. */}
+      <DayNightSky />
 
       <DesertGround />
 

@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { KeyboardControls, Html, useProgress } from '@react-three/drei'
+import { KeyboardControls, Html, useProgress, useGLTF } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { type EcctrlHandle } from 'ecctrl'
 import { VirtualButton } from 'ecctrl/input'
@@ -19,6 +19,9 @@ import { ProfilePanel } from './ProfilePanel'
 import { ObjectToolbar } from './ObjectToolbar'
 import { MusicPlayer } from './MusicPlayer'
 import { SkillsButton } from './SkillsButton'
+import { ControlsInfoModal } from './ControlsInfoModal'
+import { useTutorialStore } from '@/utils/tutorialStore'
+import { HERO_MODELS } from '@/utils/heroModels'
 import { useCameraZoomStore } from '@/utils/cameraZoomStore'
 import { useIsMobileViewport } from '@/utils/useIsMobileViewport'
 import { useIsTouchDevice } from '@/utils/useIsTouchDevice'
@@ -181,6 +184,38 @@ export function GameMode() {
   useEffect(() => {
     if (assetsReady) setIsLoaded(true)
   }, [assetsReady])
+
+  // Обучение при первом входе (по просьбе клиента) - см. подробности в
+  // tutorialStore.ts. Срабатывает ровно один раз за первый ЛОГИЧЕСКИЙ
+  // вход (isLoaded становится true) - не привязано к assetsReady напрямую,
+  // чтобы не открыться повторно из-за отдельного дребезга того стора.
+  const [tutorialOpen, setTutorialOpen] = useState(false)
+  useEffect(() => {
+    if (isLoaded && !useTutorialStore.getState().seen) {
+      setTutorialOpen(true)
+      useTutorialStore.getState().markSeen()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded])
+
+  // Фоновая подгрузка НЕ выбранных сейчас героев (по просьбе клиента
+  // "убрать временно ограничение $9.99 и дать выбор героя") - раньше
+  // (когда второй герой был locked) выбор вживую через NPC-диалог/Профиль
+  // реально перегружал видеопамять посреди игры и ронял WebGL-контекст
+  // (см. подробный фикс в QuestUI.tsx) - именно ПОТОМУ, что модель ни разу
+  // не грузилась заранее. Задержка в 6с - заведомо позже критичного
+  // "тяжёлого" старта (тот же принцип, что и у AdaptivePerformance.tsx:
+  // 3.5с до первого замера fps), чтобы эта фоновая подгрузка не сложилась
+  // с уже самой тяжёлой фазой старта игры. Второй герой теперь ещё и
+  // заметно легче (512px текстуры вместо 1024, ~1.4 МБ) - меньше риск,
+  // даже если игрок откроет выбор раньше, чем сработает этот таймер.
+  useEffect(() => {
+    if (!isLoaded) return
+    const t = window.setTimeout(() => {
+      HERO_MODELS.filter((m) => !m.locked).forEach((m) => useGLTF.preload(m.url))
+    }, 6000)
+    return () => window.clearTimeout(t)
+  }, [isLoaded])
 
   // Полное пересоздание Canvas (см. key ниже) - основной способ пережить
   // потерю WebGL-контекста. По отзыву клиента "иногда выкидывает после
@@ -672,6 +707,7 @@ export function GameMode() {
           <TeleportEffect />
           <ProfilePanel />
           <ObjectToolbar />
+          {tutorialOpen && <ControlsInfoModal onClose={() => setTutorialOpen(false)} />}
         </>
       )}
 

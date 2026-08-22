@@ -11,6 +11,7 @@ import type { GraphicsQuality } from '@/utils/graphicsQualityStore'
 import { useCraftStore } from '@/utils/craftStore'
 import { usePlayerProfileStore } from '@/utils/playerProfileStore'
 import { useMultiplayerStore } from '@/utils/multiplayerStore'
+import { useSoundStore } from '@/utils/soundStore'
 import { ControlsInfoModal } from './ControlsInfoModal'
 import { InstallAppButton } from './InstallAppButton'
 
@@ -74,6 +75,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const setNickname = usePlayerProfileStore((s) => s.setNickname)
   const attemptedMultiplayerLogin = useMultiplayerStore((s) => s.attemptedLogin)
   const loginMultiplayer = useMultiplayerStore((s) => s.login)
+  const sfxVolume = useSoundStore((s) => s.volume)
+  const setSfxVolume = useSoundStore((s) => s.setVolume)
 
   return (
     <div
@@ -190,6 +193,22 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             Тени {shadowsEnabled ? 'включены' : 'выключены'}
           </span>
         </label>
+
+        <div style={dividerStyle} />
+
+        {/* По просьбе клиента "звуки и звуки шагов" - процедурные эффекты
+            (soundManager.ts), громкость отдельно от музыки (MusicPlayer.tsx
+            использует свой собственный слайдер). */}
+        <span style={sectionLabelStyle}>ГРОМКОСТЬ ЭФФЕКТОВ: {Math.round(sfxVolume * 100)}%</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(sfxVolume * 100)}
+          onChange={(e) => setSfxVolume(Number(e.currentTarget.value) / 100)}
+          style={{ accentColor: '#5fd4ff', cursor: 'pointer', width: '100%' }}
+        />
 
         <div style={dividerStyle} />
 

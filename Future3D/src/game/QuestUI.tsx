@@ -5,6 +5,8 @@ import { QUESTS, areAllQuestsDone, useQuestStore } from '@/utils/questStore'
 import { useGameStore } from '@/utils/gameStore'
 import { HERO_MODELS } from '@/utils/heroModels'
 import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
+import { playQuestAccept, playQuestComplete } from '@/utils/soundManager'
+import { vibrate } from '@/utils/haptics'
 
 const panelStyle: CSSProperties = {
   position: 'absolute',
@@ -79,7 +81,14 @@ export function QuestDialogue() {
     line = 'Ещё раз спасибо за помощь, путник. Больше дел для тебя пока нет.'
   } else if (phase === 'not_started') {
     line = quest.npc.offer
-    action = { label: 'Принять задание', onClick: acceptQuest }
+    action = {
+      label: 'Принять задание',
+      onClick: () => {
+        acceptQuest()
+        playQuestAccept()
+        vibrate(30)
+      },
+    }
   } else if (phase === 'active') {
     line = quest.npc.inProgress
   } else {
@@ -89,6 +98,8 @@ export function QuestDialogue() {
       onClick: () => {
         turnIn()
         addScore(quest.reward)
+        playQuestComplete()
+        vibrate([30, 40, 30])
       },
     }
   }

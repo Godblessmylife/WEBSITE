@@ -12,6 +12,7 @@ import { useHeroSelectionStore } from '@/utils/heroSelectionStore'
 import { resolveHeroModel, WALK_CLIP_PATTERN } from '@/utils/heroModels'
 import { useSkillStore } from '@/utils/skillStore'
 import { useCraftStore } from '@/utils/craftStore'
+import { playFootstep, playJump } from '@/utils/soundManager'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 const EMPTY_MOVEMENT = {
@@ -42,6 +43,12 @@ const RUN_CLIP_PATTERN = /run/i
 // анимации, слишком медленно - персонаж ощутимо продолжает предыдущую
 // анимацию после того, как уже должен был остановиться/побежать.
 const FADE_DURATION = 0.2
+
+// Интервал между звуками шагов (по просьбе клиента "звуки шагов") -
+// подобран на глаз под типичный темп анимации ходьбы/бега, бег звучит
+// заметно чаще, как и в жизни.
+const WALK_STEP_INTERVAL = 0.42
+const RUN_STEP_INTERVAL = 0.28
 
 // Обычная гравитация теперь приходит из ЭТОГО поля (см. GameMode.tsx:
 // <Physics gravity={[0,0,0]}>), а не из глобальной настройки физики —
@@ -89,6 +96,13 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
   const animStateRef = useRef<AnimState>('idle')
   const [, getKeys] = useKeyboardControls()
   const setGravityField = useCustomGravity((s) => s.setGravityField)
+  // Звук шагов (по просьбе клиента) - таймер обратного отсчёта до
+  // следующего шага, тикает только пока персонаж реально идёт/бежит (см.
+  // ветку ниже в useFrame). Бег - более частые шаги, чем ходьба, как и в
+  // реальности. 0 в начале - первый шаг звучит сразу при старте движения,
+  // а не после ожидания целого интервала "в пустоту".
+  const footstepTimerRef = useRef(0)
+  const prevJumpRef = useRef(false)
 
   // Ищем нужные клипы один раз - Object.values(actions) не меняется между
   // рендерами, пересчитывать на каждый кадр незачем.
@@ -212,6 +226,18 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     // дополнительно замораживает и клавиатурное/джойстик-движение.
     const cursorMode = useCraftStore.getState().moveModeEnabled
 
+    // Звук прыжка (по просьбе клиента) - по нарастающему фронту нажатия
+    // (не "зажато", а именно "только что нажали"), тот же приём edge-
+    // detection, что уже используется в CarEntryTrigger (CarDriving.tsx)
+    // для ENTER. Не звучит в God Mode/за рулём/в режиме курсора/во время
+    // скилла - там прыжок физически не выполняется (см. EMPTY_MOVEMENT
+    // ниже), проигрывать звук несуществующего действия не нужно.
+    const jumpPressed = keys.jump || !!jumpButton
+    if (jumpPressed && !prevJumpRef.current && !godMode && !isDriving && !activeSkillId && !cursorMode) {
+      playJump()
+    }
+    prevJumpRef.current = jumpPressed
+
     // В God Mode/за рулём/во время скилла/в режиме курсора Ecctrl не
     // должен пытаться сам ходить/прыгать/поворачивать персонажа обычным
     // способом — передаём ему "все клавиши отпущены", а не читаем
@@ -305,10 +331,27 @@ export function PlayerCharacter({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHand
     const speed = handle.relativeVelOnPlane.length()
     if (!handle.isMoving || speed < 0.05) {
       setAnimState('idle')
+      // Стоя на месте - следующий шаг должен прозвучать сразу, как только
+      // персонаж снова тронется, а не после "доедания" остатка старого
+      // интервала - иначе первый шаг после остановки иногда пропадал бы.
+      footstepTimerRef.current = 0
     } else if (keys.run) {
       setAnimState('run')
     } else {
       setAnimState('walk')
+    }
+
+    // Звук шагов (по просьбе клиента) - таймер тикает, только пока
+    // персонаж реально идёт/бежит по земле (animStateRef уже отражает это
+    // выше) - не звучит во время God Mode/вождения/курсора/скилла (там
+    // либо ранний return выше, либо animState='idle').
+    if (animStateRef.current === 'walk' || animStateRef.current === 'run') {
+      footstepTimerRef.current -= delta
+      if (footstepTimerRef.current <= 0) {
+        const running = animStateRef.current === 'run'
+        playFootstep(running)
+        footstepTimerRef.current += running ? RUN_STEP_INTERVAL : WALK_STEP_INTERVAL
+      }
     }
   })
 

@@ -5,6 +5,8 @@ import * as THREE from 'three'
 import type { EcctrlHandle } from 'ecctrl'
 import { useGameStore } from '@/utils/gameStore'
 import { useGamePerfStore } from '@/utils/gamePerfStore'
+import { playPickup } from '@/utils/soundManager'
+import { vibrate } from '@/utils/haptics'
 
 const COLLECT_DISTANCE = 1.4
 const SCORE_PER_BONUS = 10
@@ -135,6 +137,8 @@ export function Bonuses({ ecctrlRef }: { ecctrlRef: RefObject<EcctrlHandle | nul
         collectedRef.current = collectedRef.current.map((c, idx) => (idx === i ? true : c))
         setCollected(collectedRef.current)
         addScore(SCORE_PER_BONUS)
+        playPickup()
+        vibrate(30)
       }
     })
   })

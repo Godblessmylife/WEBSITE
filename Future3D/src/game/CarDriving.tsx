@@ -10,6 +10,8 @@ import { useDriveStore, driveLiveStore } from '@/utils/driveStore'
 import car1Url from '../models/Car1.glb'
 import car2Url from '../models/car2.glb'
 import { CAR_WORLD_BOUND } from './worldConstants'
+import { engineSound } from '@/utils/soundManager'
+import { vibrate } from '@/utils/haptics'
 
 const EMPTY_JOYSTICK = { x: 0, y: 0 }
 // Переиспользуемый temp-вектор для проверки расстояния до машины (тот же
@@ -103,6 +105,8 @@ export function performCarInteraction(id: string, ecctrlRef: RefObject<EcctrlHan
       handle.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     }
     useDriveStore.getState().exit()
+    engineSound.stop()
+    vibrate(20)
     return
   }
 
@@ -110,6 +114,8 @@ export function performCarInteraction(id: string, ecctrlRef: RefObject<EcctrlHan
   const [px, py, pz] = carRestPosition(id)
   if (handle.currPos.distanceTo(tempCarPos.set(px, py, pz)) < ENTER_DISTANCE) {
     useDriveStore.getState().enter(id)
+    engineSound.start()
+    vibrate(20)
   }
 }
 
@@ -197,6 +203,10 @@ export function DrivingCar() {
     } else if (speedRef.current < 0) {
       speedRef.current = Math.min(0, speedRef.current + BRAKE * delta)
     }
+
+    // Гул двигателя (по просьбе клиента) - высота/громкость растут с
+    // модулем скорости независимо от направления (задний ход тоже "газует").
+    engineSound.setSpeed(Math.abs(speedRef.current) / MAX_SPEED)
 
     // Клавиатура - вкл/выкл (-1/0/1), джойстик - плавно пропорционально
     // отклонению стика (небольшая мёртвая зона 0.15, чтобы дрожание
