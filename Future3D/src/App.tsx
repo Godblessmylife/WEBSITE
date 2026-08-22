@@ -20,8 +20,11 @@ import { StratosphereFlash } from '@/components/StratosphereFlash'
 import { ScrollHint } from '@/components/ScrollHint'
 import { useGameStore } from '@/utils/gameStore'
 import { useGalleryStore } from '@/utils/galleryStore'
+import { useCompanyPageStore } from '@/utils/companyPageStore'
 import { SCROLL_HEIGHT_VH } from '@/utils/scrollStore'
 import { GlobalBackdrop } from '@/components/GlobalBackdrop'
+import { CompanyPage } from '@/components/CompanyPage'
+import { PaymentDetailsPage } from '@/components/PaymentDetailsPage'
 import './styles/globals.css'
 
 // GameMode тянет за собой ecctrl + @react-three/rapier (WASM-физика) —
@@ -46,8 +49,19 @@ export function App() {
   // не влияет на сам запуск (в standalone-режиме адресной строки и так не
   // видно, но обычный браузер её показывает).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('play') === 'game') {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('play') === 'game') {
       setGameActive(true)
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    // Тот же приём для отдельных "страниц" сайта, у которых нет
+    // собственного маршрута на сервере (деплой - обычная статика через
+    // scp, без SPA-фолбэка на index.html) - ссылка вида
+    // "/?page=about" открывает CompanyPage поверх лендинга сразу при
+    // загрузке, без необходимости настраивать роутинг на хостинге.
+    const pageParam = params.get('page')
+    if (pageParam === 'about' || pageParam === 'payment') {
+      useCompanyPageStore.getState().open(pageParam)
       window.history.replaceState(null, '', window.location.pathname)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +132,8 @@ export function App() {
 
       {isGalleryOpen && <PortfolioGallery />}
       <PortfolioCardDetail />
+      <CompanyPage />
+      <PaymentDetailsPage />
 
       {/* Тюнер путешествия (шестерёнка в левом нижнем углу) убран по
           повторной просьбе клиента - сам компонент (JourneyTuner.tsx)

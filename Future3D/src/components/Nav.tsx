@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useScrollStore } from '@/utils/scrollStore'
+import { useCompanyPageStore } from '@/utils/companyPageStore'
 
 // Раньше кнопки доскролливали до точки внутри 3D-путешествия (progress
 // 0-1) — по сути никуда, реального контента там не было. Теперь ведут
@@ -21,8 +22,12 @@ export function Nav() {
   return (
     <nav style={navStyle}>
       {NAV_ITEMS.map((item) => (
-        <NavButton key={item.label} label={item.label} anchor={item.anchor} />
+        <NavButton key={item.label} label={item.label} onClick={() => useScrollStore.getState().scrollToElement(item.anchor)} />
       ))}
+      {/* Отдельная полноэкранная страница (CompanyPage.tsx), а не anchor-
+          секция - открывается поверх сайта, не участвует в скролле
+          путешествия. */}
+      <NavButton label="О компании" onClick={() => useCompanyPageStore.getState().open('about')} />
       <style>{NAV_BUTTON_CSS}</style>
     </nav>
   )
@@ -36,14 +41,14 @@ export function Nav() {
 // ему не нужен WebGL-контекст ради эффекта). При наведении кнопка
 // приподнимается к зрителю (translateY + лёгкий наклон по X через
 // perspective) и по ней слева направо пробегает световой блик.
-function NavButton({ label, anchor }: { label: string; anchor: string }) {
+function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <button
       className="nav-3d-btn"
       style={hovered ? navButtonHoverStyle : navButtonStyle}
-      onClick={() => useScrollStore.getState().scrollToElement(anchor)}
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
