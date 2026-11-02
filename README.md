@@ -139,3 +139,4 @@ Copy `.env.example` to `.env` and fill in your own values. Never commit real key
 
 Ioannes Avakian, senior software engineer (full-stack, distributed systems, blockchain).
 Contact: masterofscience1993@gmail.com
+Telegram t.me/web3elchapo
