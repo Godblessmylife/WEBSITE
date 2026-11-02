@@ -1,6 +1,6 @@
 # Future3D
 
-An immersive 3D website with a playable 3D world inside it. Scroll through a journey from the sky to space, press **START**, and walk, drive and complete quests in a browser game, all in one TypeScript app.
+An immersive 3D website with a playable 3D world inside it. Scroll through a journey from the sky to space, press **START**, and walk, drive and complete quests in a browser game, all in one . 
 
 > **Status: prototype demo.** The site and the game run in the browser. Content, quests and multiplayer are still in progress.
 
